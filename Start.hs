@@ -1,7 +1,7 @@
 --{-# OPTIONS -Wall -fwarn-incomplete-patterns #-}
-{-# LANGUAGE KindSignatures, DataKinds, ScopedTypeVariables, 
+{-# LANGUAGE KindSignatures, DataKinds, ScopedTypeVariables, PolyKinds, UndecidableInstances,
              MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances,
-             GADTs, DeriveFunctor, RankNTypes, EmptyCase #-}
+             GADTs, DeriveFunctor, RankNTypes, EmptyCase, TypeFamilies #-}
 module Start where
 
 import Data.Proxy
@@ -64,7 +64,7 @@ extrRef :: Extended u v -> Ref v
 extrRef (EBind r) = r
 
 extend :: forall w . Worldly w => TYPE w -> Extended w (Bind w)
-extend ty = EBind (Ref (next (Proxy :: Proxy w)) (unsafeCoerce ty))
+extend ty = EBind (Ref (next (Proxy :: Proxy w)) (wk ty))
 
 data VarOp (n :: Nat)(m :: Nat)(v :: World)(w :: World) where
   IdVO :: VarOp n n v v
@@ -113,19 +113,32 @@ class Dischargable (f :: World -> *)(g :: World -> *) | g -> f , f -> g where
 instance Dischargable (Tm Zero) (Tm (Suc Zero)) where
   discharge x = varOp (Abst IdVO x) 
 
-data WorldLE (w :: World)(w' :: World) where
-  WorldRefl :: WorldLE w w
-  WorldBind :: WorldLE w w' -> WorldLE w (Bind w')  
+type family EQ x y where
+  EQ x x = True
+  EQ x y = False
 
-worldExtend :: WorldLE w (Bind w)
-worldExtend = WorldBind WorldRefl
+type family OR x y where
+  OR True y = True
+  OR x True = True
+  OR False y = y
+  OR x False = x
+
+type family WorldLT (w :: World)(w' :: World) :: Bool where
+  WorldLT w (Bind w') = WorldLE w w'
+  WorldLT w w'        = False
+
+type family WorldLE (w :: World)(w' :: World) :: Bool where
+  WorldLE w w' = OR (EQ w w') (WorldLT w w')
 
 (!-) :: (Worldly w , Dischargable f g) =>
-        TYPE w -> (forall w' . WorldLE w w' -> En Zero w' -> Maybe (f w')) ->
+        TYPE w -> (forall w' . WorldLE w w' ~ True => En Zero w' -> Maybe (f w')) ->
         Maybe (g w)
-ty !- f = fmap (discharge x) (f worldExtend e) where
+ty !- f = fmap (discharge x) (f e) where
   x = extend ty
   e = P (extrRef x) :$ B0
+
+wk :: (VarOperable i, WorldLE w w' ~ True) => i n w -> i n w'
+wk = unsafeCoerce
   
 {-    
 type TC = Maybe
