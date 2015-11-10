@@ -1,16 +1,30 @@
-{-# OPTIONS -Wall -fwarn-incomplete-patterns #-}
-{-# LANGUAGE KindSignatures, DataKinds, 
+--{-# OPTIONS -Wall -fwarn-incomplete-patterns #-}
+{-# LANGUAGE KindSignatures, DataKinds, ScopedTypeVariables, 
+             MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances,
              GADTs, DeriveFunctor, RankNTypes, EmptyCase #-}
 module Start where
 
-import Data.Maybe
+import Data.Proxy
 import Unsafe.Coerce
 
-data World = W0
+data World = W0 | Bind World
+
+class Worldly (w :: World) where
+  next :: Proxy w -> Int
+
+instance Worldly W0 where
+  next _ = 0
+
+instance Worldly w => Worldly (Bind w) where
+  next (_ :: Proxy (Bind w)) = next (Proxy :: Proxy w) + 1
 
 data Nat = Zero | Suc Nat
 
-data Ref w = Ref (Int , TYPE w)
+data Ref w = Ref {refname :: Int , reftype :: TYPE w}
+-- export only projection reftype and eq instance defined on ints only
+
+instance Eq (Ref w) where
+  Ref i _ == Ref j _ = i == j
 
 data Fin (n :: Nat) where
   FZero :: Fin (Suc n)
@@ -44,6 +58,13 @@ type TYPE = Tm Zero  -- trusted
 type TERM = Tm Zero  -- not trusted
 
 data Extended (u :: World)(v :: World) where
+  EBind :: Ref (Bind u) -> Extended u (Bind u)
+
+extrRef :: Extended u v -> Ref v
+extrRef (EBind r) = r
+
+extend :: forall w . Worldly w => TYPE w -> Extended w (Bind w)
+extend ty = EBind (Ref (next (Proxy :: Proxy w)) (unsafeCoerce ty))
 
 data VarOp (n :: Nat)(m :: Nat)(v :: World)(w :: World) where
   IdVO :: VarOp n n v v
@@ -52,7 +73,8 @@ data VarOp (n :: Nat)(m :: Nat)(v :: World)(w :: World) where
   Abst :: VarOp Zero m u w -> Extended u v -> VarOp Zero (Suc m) v w
 
 thicken :: Extended u v -> Ref v -> Maybe (Ref u)
-thicken = _
+thicken (EBind x) y | x == y    = Nothing
+                    | otherwise = Just $ unsafeCoerce y
 
 class VarOperable (i :: Nat -> World -> *) where
   varOp :: VarOp n m v w -> i n v -> i m w
@@ -78,11 +100,33 @@ instance VarOperable Hd where
     help (Weak f)   r = fmap FSuc (help f r)
     help (Inst f h) r = help f r
     help (Abst f x) r = maybe (Right FZero) (fmap FSuc . help f) (thicken x r)
+
 instance VarOperable Tm where
   varOp f (En e)   = En (varOp f e)
   varOp f Set      = Set
   varOp f (Pi s t) = Pi (varOp f s) (varOp (Weak f) t)
   varOp f (Lam t)  = Lam (varOp (Weak f) t)
+
+class Dischargable (f :: World -> *)(g :: World -> *) | g -> f , f -> g where
+  discharge :: Extended u v -> f v -> g u
+
+instance Dischargable (Tm Zero) (Tm (Suc Zero)) where
+  discharge x = varOp (Abst IdVO x) 
+
+data WorldLE (w :: World)(w' :: World) where
+  WorldRefl :: WorldLE w w
+  WorldBind :: WorldLE w w' -> WorldLE w (Bind w')  
+
+worldExtend :: WorldLE w (Bind w)
+worldExtend = WorldBind WorldRefl
+
+(!-) :: (Worldly w , Dischargable f g) =>
+        TYPE w -> (forall w' . WorldLE w w' -> En Zero w' -> Maybe (f w')) ->
+        Maybe (g w)
+ty !- f = fmap (discharge x) (f worldExtend e) where
+  x = extend ty
+  e = P (extrRef x) :$ B0
+  
 {-    
 type TC = Maybe
 
