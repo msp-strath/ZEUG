@@ -1,0 +1,183 @@
+syntax term Q, R, S, T, q, r, s, t  -:
+  [e]
+  (x : S) -> T 
+  (x : S) * T 
+  A = B
+  a {Q} b
+  \ x -> t
+  s , t
+
+syntax elimination E, F, e, f  -:
+  x
+  f s
+  Q p
+  f fst
+  f snd
+  s:S
+
+syntax point p  -:
+  i
+  0
+  1
+  i[p0-p1]
+
+syntax end A, B, a, b  -:
+  @
+  T
+
+judgment TYPE T
+judgment E TYPE
+judgment T :> t
+judgment e <: S
+judgment END A
+judgment T END a
+judgment POINT p
+judgment S <= T
+judgment S == T
+judgment T :> s == t
+judgment e == f <: S
+judgment T REFINES A 
+judgment T :> t REFINES a
+
+T :> [e]  -:
+  e <: S
+  S <= T
+
+s:S <: S  -:
+  TYPE S
+  S :> s
+
+x <: S  -:
+  x : S in context
+
+TYPE (x : S) -> T  -:
+  TYPE S
+  x : S |- TYPE T
+
+(x : S) -> T :> \ x -> t  -:
+  x : S |- T :> t
+
+f s <: T[s:S/x]  -:
+  f <: (x : S) -> T
+  S :> s
+
+TYPE (x : S) * T  -:
+  TYPE S
+  x : S |- TYPE T
+
+(x : S) * T :> s , t  -:
+  S :> s
+  T[s:S/x] :> t
+
+e fst <: S  -:
+  e <: (x : S) * T
+
+e snd <: T[e fst:S/x]  -:
+  e <: (x : S) * T
+
+TYPE A = B  -:
+  END A
+  END B
+
+END @  -:
+
+END T  -:
+  TYPE T
+
+A = B :> \ i -> T  -:
+  i |- TYPE T
+  T[0/i] REFINES A
+  T[1/i] REFINES B
+
+T REFINES @  -:
+
+T REFINES S  -:
+  S == T
+
+TYPE [E]  -:
+  E TYPE
+
+Q p TYPE  -:
+  @=@ :> Q
+  POINT p
+
+S =@ <= @=@  -:
+@= T <= @=@  -:
+S = T <= S =@  -:
+S = T <= @= T  -:
+
+POINT 0 -:
+POINT 1 -:
+POINT i -:
+  i in context
+
+TYPE a {Q} b  -:
+  [Q 0] END a
+  [Q 1] END b
+
+T END @  -:
+T END t  -:
+  T :> t
+
+a {Q} b :> \ i -> t  -:
+  i |- [Q i] :> t
+  [Q 0] :>  t[0/i] REFINES a 
+  [Q 1] :>  t[1/i] REFINES b
+
+T :> t REFINES @  -:
+
+T :> t REFINES s  -:
+  T :> s == t
+  
+q p <: Q p  -:
+  q <: a {Q} b
+  POINT p
+
+defining p[p0-p1]  -:
+  0[p0-p1] = p0
+  1[p0-p1] = p1
+  i[p0-p1] = i[p0-p1]
+  i[p0'-p1'][p0-p1] = i[p0'[p0-p1]-p1'[p0-p1]]
+  i[p-p] = p
+  i[0-1] = i
+
+Q . Q' <: A = D  -:
+  Q <: A = B
+  Q' <: C = D
+  [Q 1] == [Q' 0]
+
+q . q' <: a {Q . Q'} d  -:
+  q <: a {Q} b
+  q' <: c {Q'} d
+  [Q 1] == [Q' 0]
+  [Q 1] :> [q 1] == [q 0]
+
+
+t -@ Q <: t {Q}@  -:
+  Q <: A = B
+  [Q 0] :> t
+
+Q @- t <: @{Q} t  -:
+  Q <: A = B
+  [Q 1] :> t
+
+defining ~Q  -:
+  ~Q = \ i -> Q i[1-0]
+
+defining Q @- t  -:
+  Q @- t = ~(t -@ ~Q)
+
+defining t-@ Q  -:
+  f -@ (\ i -> (x : S(i)) -> T(i,x)) =
+    \ i -> \ x ->
+      let eS = (\ j -> S(j[0-i])) @- x
+          eT = f (eS 0) -@ (\ j -> T(j[0-i],eS j))
+      in  eT 1
+  e -@ (\ i -> (x : S(i)) * T(i,x)) =
+    \ i ->
+      let eS = e fst -@ (\ j -> S(j[0-i]))
+          eT = e snd -@ (\ j -> T(j[0-i],eS j))
+      in  eS 1 , eT 1
+  e -@ (Q . Q') = let e' = e -@ Q in e' . (e' 1 -@ Q')
+  E -@ (\ i -> A(i) = B(i)) =
+    \ i -> (\ j -> A(j[i-0])) . E . (\ j -> B(j[0-i]))
