@@ -2,7 +2,7 @@ syntax term Q, R, S, T, q, r, s, t  -:
   [e]
   (x : S) -> T 
   (x : S) * T 
-  A = B
+  S = T
   a {Q} b
   \ x -> t
   s , t
@@ -10,7 +10,7 @@ syntax term Q, R, S, T, q, r, s, t  -:
 syntax elimination E, F, e, f  -:
   x
   f s
-  Q p
+  E p
   f fst
   f snd
   s:S
@@ -21,22 +21,20 @@ syntax point p  -:
   1
   i[p0-p1]
 
-syntax end A, B, a, b  -:
+syntax end a, b  -:
   @
-  T
+  t
 
 judgment TYPE T
 judgment E TYPE
 judgment T :> t
 judgment e <: S
-judgment END A
 judgment T END a
 judgment POINT p
 judgment S <= T
 judgment S == T
 judgment T :> s == t
 judgment e == f <: S
-judgment T REFINES A 
 judgment T :> t REFINES a
 
 T :> [e]  -:
@@ -75,30 +73,20 @@ e fst <: S  -:
 e snd <: T[e fst:S/x]  -:
   e <: (x : S) * T
 
-TYPE A = B  -:
-  END A
-  END B
-
-END @  -:
-
-END T  -:
+TYPE S = T  -:
+  TYPE S
   TYPE T
 
-A = B :> \ i -> T  -:
+R = T :> \ i -> S  -:
   i |- TYPE T
-  T[0/i] REFINES A
-  T[1/i] REFINES B
-
-T REFINES @  -:
-
-T REFINES S  -:
-  S == T
+  S[0/i] == R
+  S[1/i] == T
 
 TYPE [E]  -:
   E TYPE
 
-Q p TYPE  -:
-  @=@ :> Q
+E p TYPE  -:
+  E <: S = T
   POINT p
 
 S =@ <= @=@  -:
@@ -141,10 +129,10 @@ defining p[p0-p1]  -:
   i[p-p] = p
   i[0-1] = i
 
-Q . Q' <: A = D  -:
-  Q <: A = B
-  Q' <: C = D
-  [Q 1] == [Q' 0]
+Q . Q' <: R = T  -:
+  Q <: R = S
+  Q' <: S' = T
+  S == S'
 
 q . q' <: a {Q . Q'} d  -:
   q <: a {Q} b
@@ -153,13 +141,13 @@ q . q' <: a {Q . Q'} d  -:
   [Q 1] :> [q 1] == [q 0]
 
 
-t -@ Q <: t {Q}@  -:
-  Q <: A = B
-  [Q 0] :> t
+s -@ Q <: s {Q}@  -:
+  Q <: S = T
+  S :> s
 
 Q @- t <: @{Q} t  -:
-  Q <: A = B
-  [Q 1] :> t
+  Q <: S = T
+  T :> t
 
 defining ~Q  -:
   ~Q = \ i -> Q i[1-0]
