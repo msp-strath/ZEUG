@@ -1,6 +1,7 @@
 --{-# OPTIONS -Wall -fwarn-incomplete-patterns #-}
 {-# LANGUAGE KindSignatures, DataKinds, ScopedTypeVariables, PolyKinds,
-             UndecidableInstances, MultiParamTypeClasses, FunctionalDependencies,
+             UndecidableInstances, MultiParamTypeClasses,
+             FunctionalDependencies,
              FlexibleInstances, GADTs, DeriveFunctor, RankNTypes, EmptyCase,
              TypeFamilies #-}
 module TypeCheck where
