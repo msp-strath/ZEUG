@@ -10,7 +10,6 @@ import Data.Proxy
 import Unsafe.Coerce
 import Utils
 import Syntax
-import FreeVars
 
 type TC = Maybe
 
