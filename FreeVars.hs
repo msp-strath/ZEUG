@@ -1,61 +1,15 @@
---{-# OPTIONS -Wall -fwarn-incomplete-patterns #-}
-{-# LANGUAGE KindSignatures, DataKinds, ScopedTypeVariables, PolyKinds, UndecidableInstances,
-             MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances,
-             GADTs, DeriveFunctor, RankNTypes, EmptyCase, TypeFamilies #-}
-module Start where
+{-# LANGUAGE RankNTypes, DataKinds, KindSignatures, GADTs,
+             MultiParamTypeClasses, FunctionalDependencies,
+             TypeFamilies, PolyKinds, UndecidableInstances,
+             FlexibleInstances, ScopedTypeVariables #-}
+module FreeVars where
 
-import Data.Proxy
 import Unsafe.Coerce
+import Data.Proxy
+import Utils
+import Syntax
 
-data World = W0 | Bind World
-
-class Worldly (w :: World) where
-  next :: Proxy w -> Int
-
-instance Worldly W0 where
-  next _ = 0
-
-instance Worldly w => Worldly (Bind w) where
-  next (_ :: Proxy (Bind w)) = next (Proxy :: Proxy w) + 1
-
-data Nat = Zero | Suc Nat
-
-data Ref w = Ref {refname :: Int , reftype :: TYPE w}
--- export only projection reftype and eq instance defined on ints only
-
-instance Eq (Ref w) where
-  Ref i _ == Ref j _ = i == j
-
-data Fin (n :: Nat) where
-  FZero :: Fin (Suc n)
-  FSuc  :: Fin n -> Fin (Suc n)
-
-absurd :: Fin Zero -> a
-absurd k = case k of {}
-
-newtype Fink (n :: Nat)(w :: World) = Fink {fink :: Fin n}
-
-data Bwd x = B0 | Bwd x :< x deriving Functor
-
-(+<+) :: Bwd x -> Bwd x -> Bwd x
-xs +<+ B0 = xs
-xs +<+ (ys :< y) = (xs +<+ ys) :< y
-
-data Hd (n :: Nat)(w :: World) where
-  V :: Fin n -> Hd n w
-  P :: Ref w -> Hd n w
-  (:::) :: Tm n w -> Tm n w -> Hd n w
-
-data En (n :: Nat)(w :: World) = Hd n w :$ Bwd (Tm n w)
-
-data Tm (n :: Nat)(w :: World) where
-  En  :: En n w -> Tm n w
-  Set :: Tm n w
-  Pi  :: Tm n w -> Tm (Suc n) w -> Tm n w
-  Lam :: Tm (Suc n) w -> Tm n w
-
-type TYPE = Tm Zero  -- trusted
-type TERM = Tm Zero  -- not trusted
+-- stuff related to free variables
 
 data Extended (u :: World)(v :: World) where
   EBind :: Ref (Bind u) -> Extended u (Bind u)
@@ -63,6 +17,7 @@ data Extended (u :: World)(v :: World) where
 extrRef :: Extended u v -> Ref v
 extrRef (EBind r) = r
 
+-- this is creating a ref, given a type
 extend :: forall w . Worldly w => TYPE w -> Extended w (Bind w)
 extend ty = EBind (Ref (next (Proxy :: Proxy w)) (wk ty))
 
@@ -140,33 +95,5 @@ ty !- f = fmap (discharge x) (f e) where
 wk :: (VarOperable i, WorldLE w w' ~ True) => i n w -> i n w'
 wk = unsafeCoerce
   
-{-    
-type TC = Maybe
 
-isType :: TERM -> TC ()
-isType (En e) = enType e >> return ()
-isType Set    = return ()
-isType (Pi sty tty) = do
-  isType sty
-  undefined
-isType _ = error "blerk"
 
-(>:>) :: TYPE -> TERM -> TC ()
-(>:>) = undefined
-
-hdType :: Hd Zero -> TC TYPE
-hdType = undefined
-
-($:) :: (En Zero, TYPE) -> TERM -> TC TYPE
-($:) = undefined
-
-enType :: En Zero -> TC TYPE
-enType (h :$ sz) = hdType h >>= \ ty -> go (h,ty) sz where
-  go (h,ty) B0        = return ty
-  go (h,ty) (sz :< s) = do
-    ety <- go (h,ty) sz
-    (h :$ sz, ety) $: s
-
-(!-) :: TYPE -> (En Zero -> TC ()) -> TC ()
-(!-) = undefined
--- -}
