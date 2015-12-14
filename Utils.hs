@@ -4,6 +4,8 @@ module Utils where
 
 data Nat = Zero | Suc Nat
 
+type One = Suc Zero
+
 data Fin (n :: Nat) where
   FZero :: Fin (Suc n)
   FSuc  :: Fin n -> Fin (Suc n)

@@ -13,13 +13,20 @@ import Syntax
 
 type TC = Maybe
 
-isType :: TERM w -> TC ()
-isType (En e) = enType e >> return ()
-isType Set    = return ()
+isType :: Worldly w => TERM w -> TC (Happy w)
+isType (En e) = do
+  ty <- enType e
+  case whnf ty of
+    Set -> return Happy
+    _   -> fail "barf"
+isType Set    = return Happy
 isType (Pi sty tty) = do
   isType sty
-  undefined
-isType _ = error "blerk"
+  sty !- \ x -> isType (tty // x)
+isType _ = fail "blerk"
+
+whnf :: TERM w -> TERM w
+whnf = id
 
 (>:>) :: TYPE w -> TERM w -> TC ()
 (>:>) = undefined

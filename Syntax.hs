@@ -4,6 +4,8 @@
              FlexibleInstances, ScopedTypeVariables #-}
 module Syntax(
   World(),
+  Worldly,
+  Happy(..),
   Ref(reftype), -- not exporting refname
   Extended(),
   extrRef,
@@ -13,6 +15,9 @@ module Syntax(
   Tm(..),
   TERM,
   TYPE,
+  wk,
+  (!-),
+  (//),
   ) where
 import Utils
 import Unsafe.Coerce
@@ -23,6 +28,9 @@ data World = W0 | Bind World
 
 -- currently unneeded hack:
 -- newtype Fink (n :: Nat)(w :: World) = Fink {fink :: Fin n}
+
+data Happy :: World -> * where
+  Happy :: Happy w
 
 -- syntax indexed by contexts of bound and free variables
 
@@ -86,7 +94,7 @@ class VarOperable (i :: Nat -> World -> *) where
   -- vclosed things can trivially weakened
   
 data VarOp (n :: Nat)(m :: Nat)(v :: World)(w :: World) where
-  IdVO :: VarOp n n v v
+  IdVO :: WorldLE v w ~ True => VarOp n n v w
   Weak :: VarOp n m v w -> VarOp (Suc n) (Suc m) v w
   Inst :: VarOp n Zero v w -> Hd Zero w -> VarOp (Suc n) Zero v w
   -- instantiates bound index 0 with a valid neutral term
@@ -112,7 +120,7 @@ instance VarOperable Hd where
   varOp f (P x) = either vclosed V (help f x) where
     help :: forall n m v w . VarOp n m v w -> Ref v ->
             Either (Hd Zero w) (Fin m)
-    help IdVO       r = Left (P r)
+    help IdVO       r = Left (wk (P r))
     help (Weak f)   r = fmap FSuc (help f r)
     help (Inst f h) r = help f r
     help (Abst f x) r =
@@ -131,7 +139,10 @@ class Dischargable (f :: World -> *)(g :: World -> *)
   discharge :: Extended u v -> f v -> g u
 
 instance Dischargable (Tm Zero) (Tm (Suc Zero)) where
-  discharge x = varOp (Abst IdVO x) 
+  discharge x = varOp (Abst IdVO x)
+
+instance Dischargable Happy Happy where
+  discharge _ Happy = Happy -- :)
 
 type family EQ x y where
   EQ x x = True
@@ -152,12 +163,15 @@ type family WorldLE (w :: World)(w' :: World) :: Bool where
 
 -- this doesn't need to be in this module as it uses extend and extrRef
 (!-) :: (Worldly w , Dischargable f g) =>
-        TYPE w -> (forall w' . WorldLE w w' ~ True => En Zero w' ->
-                   Maybe (f w')) ->
-        Maybe (g w)
+        TYPE w -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
+                   Hd Zero w' -> Maybe (f w')) -> Maybe (g w)
 ty !- f = fmap (discharge x) (f e) where
   x = extend ty
-  e = P (extrRef x) :$ B0
+  e = P (extrRef x)
+
+(//) :: (WorldLE w w' ~ True, VarOperable t) =>
+        t One w -> Hd Zero w' -> t Zero w'
+body // x = varOp (Inst IdVO x) body
 
 wk :: (VarOperable i, WorldLE w w' ~ True) => i n w -> i n w'
 wk = unsafeCoerce
