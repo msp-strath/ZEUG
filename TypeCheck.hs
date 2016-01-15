@@ -32,7 +32,7 @@ isType (En ety) =
 isType Set      = Yes Happy
 isType (Pi sty tty) = 
   goodType sty >>>= \ sty ->
-    sty !- \ x -> isType (tty // P x)
+    sty !- \ x -> isType (tty // x)
 isType _ = No
 
 goodType :: Worldly w => TERM w -> TC Val w
@@ -40,7 +40,7 @@ goodType t = isType t >>>= \ _ -> Yes (val t)
 
 (>:>) :: Worldly w => Val w -> TERM w -> TC Happy w
 VSet        >:> t     = isType t -- won't work with hierarchy
-VPi dom cod >:> Lam t = dom !- \ x -> (wk cod $/ Ne (NP x)) >:> (t // P x)
+VPi dom cod >:> Lam t = dom !- \ x -> (wk cod $/ x) >:> (t // x)
 want        >:> En e  = enType e >>>= \ got -> got `subType` want
 _           >:> _      = No
 
@@ -55,7 +55,7 @@ enType (f :$ s) = enType f >>>= \ ty -> case ty of
 subType :: Worldly w => Val w -> Val w -> TC Happy w
 VSet `subType` VSet = Yes Happy
 VPi dom0 cod0 `subType` VPi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
-  dom1 !- \ x -> let vx = Ne (NP x) in (wk cod0 $/ vx) `subType` (wk cod1 $/ vx)
+  dom1 !- \ x -> (wk cod0 $/ x) `subType` (wk cod1 $/ x)
 Ne e0 `subType` Ne e1 = if e0 == e1 then Yes Happy else No
 _     `subType` _     = No
                                        

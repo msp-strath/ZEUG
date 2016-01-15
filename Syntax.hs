@@ -169,13 +169,30 @@ type family WorldLT (w :: World)(w' :: World) :: Bool where
 type family WorldLE (w :: World)(w' :: World) :: Bool where
   WorldLE w w' = OR (EQ w w') (WorldLT w w')
 
+class RefEmbeddable t where
+  emb :: Ref w -> t w
+
+instance RefEmbeddable Ref where
+  emb = id
+
+instance RefEmbeddable (En n) where
+  emb = P
+
+instance RefEmbeddable (Tm n) where
+  emb = En . emb
+
+instance RefEmbeddable Ne where
+  emb = NP
+
+instance RefEmbeddable Val where
+  emb = Ne . emb
+
 -- this doesn't need to be in this module as it uses extend and extrRef
 (!-) :: (Worldly w , Dischargeable f g) =>
         Val w -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
-                   Ref w' -> f w') -> g w
-ty !- f = discharge x (f e) where
+                   (forall r . RefEmbeddable r => r w') -> f w') -> g w
+ty !- f = discharge x (f (emb (extrRef x))) where
   x = extend ty
-  e = extrRef x
 
 (//) :: (WorldLE w w' ~ True, VarOperable t) =>
         t One w -> En Zero w' -> t Zero w'
@@ -245,9 +262,9 @@ val t = eval t E0
 etaquote :: Worldly w => Val w -> Val w -> Tm Zero w
 etaquote VSet          VSet          = Set
 etaquote VSet          (VPi dom cod) =
-  Pi (etaquote VSet dom) $ dom !- \ x -> etaquote VSet (wk cod $/ Ne (NP x))
+  Pi (etaquote VSet dom) $ dom !- \ x -> etaquote VSet (wk cod $/ x)
 etaquote (VPi dom cod) f             = 
-  Lam $ dom !- \ x -> let vx = Ne (NP x) in etaquote (wk cod $/ vx) (wk f $$ vx)
+  Lam $ dom !- \ x -> etaquote (wk cod $/ x) (wk f $$ x)
 etaquote _            (Ne e) = En $ fst (netaquote e)
 
 netaquote :: Worldly w => Ne w -> (En Zero w, Val w)
