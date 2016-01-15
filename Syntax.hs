@@ -10,11 +10,8 @@ module Syntax(
   Extended(),
   extrRef,
   extend,
-  Hd(P,(:::)),
   En(..),
   Tm(..),
-  TERM,
-  TYPE,
   wk,
   (!-),
   (//),
@@ -28,30 +25,28 @@ import Data.Maybe
 data World = W0 | Bind World
 
 -- currently unneeded hack:
--- newtype Fink (n :: Nat)(w :: World) = Fink {fink :: Fin n}
+newtype Fink (n :: Nat)(w :: World) = Fink {fink :: Fin n}
 
+-- world relative unit type
 data Happy :: World -> * where
   Happy :: Happy w
 
 -- syntax indexed by contexts of bound and free variables
 
-data Hd (n :: Nat)(w :: World) where
-  V :: Fin n -> Hd n w
-  P :: Ref w -> Hd n w
-  (:::) :: Tm n w -> Tm n w -> Hd n w
+data En (n :: Nat)(w :: World) where
+  V     :: Fin n -> En n w
+  P     :: Ref w -> En n w
+  (:$)  :: En n w -> Tm n w -> En n w
+  (:::) :: Tm n w -> Tm n w -> En n w -- type annotations
 
--- an elimination, could be neutral or could have a type annotated
--- head and could reduce (type annotation tells us how)
-data En (n :: Nat)(w :: World) = Hd n w :$ Bwd (Tm n w)
 
 data Tm (n :: Nat)(w :: World) where
-  En  :: En n w -> Tm n w
+  -- canonical things
   Set :: Tm n w
   Pi  :: Tm n w -> Tm (Suc n) w -> Tm n w
   Lam :: Tm (Suc n) w -> Tm n w
-
-type TYPE = Tm Zero  -- trusted
-type TERM = Tm Zero  -- not trusted
+  -- elimination forms
+  En  :: En n w -> Tm n w
 
 -- free variable management
 
@@ -64,7 +59,7 @@ instance Worldly W0 where
 instance Worldly w => Worldly (Bind w) where
   next (_ :: Proxy (Bind w)) = next (Proxy :: Proxy w) + 1
 
-data Ref w = Ref {refname :: Int , reftype :: TYPE w}
+data Ref w = Ref {refname :: Int , reftype :: Val w}
 -- export only projection reftype and eq instance defined on ints only
 
 instance Eq (Ref w) where
@@ -75,7 +70,7 @@ data Extended :: World -> World -> * where
   -- one-step extension of u = G ; x : S |- G
 
 -- we don't make fresh variables we make fresh context extensions
-extend :: forall w . Worldly w => TYPE w -> Extended w (Bind w)
+extend :: forall w . Worldly w => Val w -> Extended w (Bind w)
 extend ty = EBind (Ref (next (Proxy :: Proxy w)) (wk ty))
 
 -- what is the new thing?
@@ -97,19 +92,16 @@ class VarOperable (i :: Nat -> World -> *) where
 data VarOp (n :: Nat)(m :: Nat)(v :: World)(w :: World) where
   IdVO :: WorldLE v w ~ True => VarOp n n v w
   Weak :: VarOp n m v w -> VarOp (Suc n) (Suc m) v w
-  Inst :: VarOp n Zero v w -> Hd Zero w -> VarOp (Suc n) Zero v w
+  Inst :: VarOp n Zero v w -> En Zero w -> VarOp (Suc n) Zero v w
   -- instantiates bound index 0 with a valid neutral term
   Abst :: VarOp Zero m u w -> Extended u v -> VarOp Zero (Suc m) v w
   -- turns the free variable introduced by the extension into a bound
   -- variable
 
 instance VarOperable En where
-  varOp f (hd :$ tl) = varOp f hd :$ fmap (varOp f) tl
-
-instance VarOperable Hd where
   varOp f        (tm ::: ty)  = varOp f tm ::: varOp f ty
   varOp f        (V i) = either vclosed V (help f i) where
-    help :: VarOp n m v w -> Fin n -> Either (Hd Zero w) (Fin m)
+    help :: VarOp n m v w -> Fin n -> Either (En Zero w) (Fin m)
     help IdVO       i        = Right i
     help (Weak f)   FZero    = Right FZero
     help (Weak f)   (FSuc i) = fmap FSuc (help f i)
@@ -120,7 +112,7 @@ instance VarOperable Hd where
 
   varOp f (P x) = either vclosed V (help f x) where
     help :: forall n m v w . VarOp n m v w -> Ref v ->
-            Either (Hd Zero w) (Fin m)
+            Either (En Zero w) (Fin m)
     help IdVO       r = Left (wk (P r))
     help (Weak f)   r = fmap FSuc (help f r)
     help (Inst f h) r = help f r
@@ -128,13 +120,16 @@ instance VarOperable Hd where
       maybe (Right FZero) (fmap FSuc . help f) (thicken x r)
       -- either we have found the right one, or we can run  f on an
       -- old one
-
+  varOp f (hd :$ tl) = varOp f hd :$ varOp f tl
+  
 instance VarOperable Tm where
   varOp f (En e)   = En (varOp f e)
   varOp f Set      = Set
   varOp f (Pi s t) = Pi (varOp f s) (varOp (Weak f) t)
   varOp f (Lam t)  = Lam (varOp (Weak f) t)
 
+-- how to yank something that's constructed under a binder back out
+-- from under that binder turning the free variable into a de Bruijn variable
 class Dischargable (f :: World -> *)(g :: World -> *)
   | g -> f , f -> g where
   discharge :: Extended u v -> f v -> g u
@@ -164,33 +159,44 @@ type family WorldLE (w :: World)(w' :: World) :: Bool where
 
 -- this doesn't need to be in this module as it uses extend and extrRef
 (!-) :: (Worldly w , Dischargable f g) =>
-        TYPE w -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
-                   Hd Zero w' -> Maybe (f w')) -> Maybe (g w)
-ty !- f = fmap (discharge x) (f e) where
+        Val w -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
+                   Ref w' -> f w') -> g w
+ty !- f = discharge x (f e) where
   x = extend ty
-  e = P (extrRef x)
+  e = extrRef x
 
 (//) :: (WorldLE w w' ~ True, VarOperable t) =>
-        t One w -> Hd Zero w' -> t Zero w'
+        t One w -> En Zero w' -> t Zero w'
 body // x = varOp (Inst IdVO x) body
 
-wk :: (VarOperable i, WorldLE w w' ~ True) => i n w -> i n w'
-wk = unsafeCoerce
+class Weakenable (t :: World -> *) where
+  wk :: WorldLE w w' ~ True => t w -> t w'
+  wk = unsafeCoerce
+
+instance Weakenable Val
+
+instance Weakenable Ne
+
+instance Weakenable Scope
+
+instance Weakenable (Tm n)
+
+instance Weakenable (En n)
 
 -- evaluation
 data Env :: Nat -> World -> * where
   E0 :: Env Zero w
   ES :: Env n w -> Val w -> Env (Suc n) w
 
-elookup :: Fin n -> Env n w -> Val w
-elookup FZero    (ES g v) = v
-elookup (FSuc i) (ES g v) = elookup i g
-
+data Ne :: World -> * where
+  NP    :: Ref w -> Ne w
+  (:$$) :: Ne w -> Val w -> Ne w
+  
 data Val :: World -> * where
+  Ne    :: Ne w -> Val w
   VSet  :: Val w
   VPi   :: Val w -> Scope w -> Val w
   VLam  :: Scope w -> Val w
-  (:$$) :: Ref w -> Bwd (Val w) -> Val w
 
 data Scope :: World -> * where
   Scope :: Env n w -> Tm (Suc n) w -> Scope w
@@ -198,41 +204,41 @@ data Scope :: World -> * where
 ($/) :: Scope w -> Val w -> Val w
 Scope g t $/ v = eval t (ES g v)
 
-eval :: Tm n w -> Env n w -> Val w
-eval (En (hd :$ ts)) g = heval hd g `vappS` bmap (\t -> eval t g) ts
-eval Set             g = VSet
-eval (Pi sty tty)    g = VPi (eval sty g) (Scope g tty)
-eval (Lam t)         g = VLam (Scope g t)
+($$) :: Val w -> Val w -> Val w
+VLam s $$ v = s $/ v
+Ne n   $$ v = Ne (n :$$ v)
 
-vapp :: Val w -> Val w -> Val w
-VLam s     `vapp` v = s $/ v
-(x :$$ vs) `vapp` v = x :$$ (vs :< v)
+elookup :: Fin n -> Env n w -> Val w
+elookup FZero    (ES g v) = v
+elookup (FSuc i) (ES g v) = elookup i g
 
-vappS :: Val w -> Bwd (Val w) -> Val w
-vappS hd B0 = hd
-vappS hd (vs :< v) = (vappS hd vs) `vapp` v
-                        
-heval :: Hd n w -> Env n w -> Val w
-heval (V x)      g = elookup x g
-heval (P x)      g = x :$$ B0
-heval (t ::: ty) g = eval t g
+class Eval t  where
+  eval :: t n w -> Env n w -> Val w
 
-betaquote :: Val w -> Tm Zero w
-betaquote = undefined
+instance Eval En where
+  eval (V x)      g = elookup x g
+  eval (P x)      g = Ne (NP x)
+  eval (t ::: ty) g = eval t g
+  eval (f :$ s)   g = eval f g $$ eval s g
+
+instance Eval Tm where
+  eval (En e)          g = eval e g
+  eval Set             g = VSet
+  eval (Pi sty tty)    g = VPi (eval sty g) (Scope g tty)
+  eval (Lam t)         g = VLam (Scope g t)
 
 etaquote :: Worldly w => Val w -> Val w -> Tm Zero w
 etaquote VSet          VSet          = Set
 etaquote VSet          (VPi dom cod) =
-  Pi (etaquote VSet dom) $
-     fromJust $ etaquote VSet dom !- \ x ->
-       return $ etaquote VSet (cod $/ undefined)
-etaquote (VPi dom cod) f             = undefined
---  Lam $ etaquote VSet dom !- \ x -> etaquote (cod $/ x) (vapp f x)
-etaquote (x :$$ vs)    t = undefined
-etaquote _             _ = undefined
+  Pi (etaquote VSet dom) $ dom !- \ x -> etaquote VSet (wk cod $/ Ne (NP x))
+etaquote (VPi dom cod) f             = 
+  Lam $ dom !- \ x -> let vx = Ne (NP x) in etaquote (wk cod $/ vx) (wk f $$ vx)
+etaquote _            (Ne e) = En $ fst (netaquote e)
+
+netaquote :: Worldly w => Ne w -> (En Zero w, Val w)
+netaquote (NP x)    = (P x, reftype x)
+netaquote (f :$$ s) = case netaquote f of
+  (f', VPi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
 
 idE :: Env n w
 idE = undefined
-
-
--- norm :: Tm m w -> T 
