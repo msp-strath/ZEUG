@@ -13,13 +13,24 @@ module Syntax(
   En(..),
   Tm(..),
   wk,
+  Dischargeable(..),
+  TERM,
+  ELIM,
   (!-),
   (//),
+  val,
+  Val(..),
+  Ne(..),
+  ($$),
+  ($/)
   ) where
 import Utils
 import Unsafe.Coerce
 import Data.Proxy
 import Data.Maybe
+
+type TERM = Tm Zero
+type ELIM = En Zero
 
 -- contexts of free variables
 data World = W0 | Bind World
@@ -38,6 +49,7 @@ data En (n :: Nat)(w :: World) where
   P     :: Ref w -> En n w
   (:$)  :: En n w -> Tm n w -> En n w
   (:::) :: Tm n w -> Tm n w -> En n w -- type annotations
+  deriving Eq
 
 
 data Tm (n :: Nat)(w :: World) where
@@ -47,7 +59,7 @@ data Tm (n :: Nat)(w :: World) where
   Lam :: Tm (Suc n) w -> Tm n w
   -- elimination forms
   En  :: En n w -> Tm n w
-
+  deriving Eq
 -- free variable management
 
 class Worldly (w :: World) where
@@ -130,14 +142,14 @@ instance VarOperable Tm where
 
 -- how to yank something that's constructed under a binder back out
 -- from under that binder turning the free variable into a de Bruijn variable
-class Dischargable (f :: World -> *)(g :: World -> *)
+class Dischargeable (f :: World -> *)(g :: World -> *)
   | g -> f , f -> g where
   discharge :: Extended u v -> f v -> g u
 
-instance Dischargable (Tm Zero) (Tm (Suc Zero)) where
+instance Dischargeable (Tm Zero) (Tm (Suc Zero)) where
   discharge x = varOp (Abst IdVO x)
 
-instance Dischargable Happy Happy where
+instance Dischargeable Happy Happy where
   discharge _ Happy = Happy -- :)
 
 type family EQ x y where
@@ -158,7 +170,7 @@ type family WorldLE (w :: World)(w' :: World) :: Bool where
   WorldLE w w' = OR (EQ w w') (WorldLT w w')
 
 -- this doesn't need to be in this module as it uses extend and extrRef
-(!-) :: (Worldly w , Dischargable f g) =>
+(!-) :: (Worldly w , Dischargeable f g) =>
         Val w -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
                    Ref w' -> f w') -> g w
 ty !- f = discharge x (f e) where
@@ -227,6 +239,9 @@ instance Eval Tm where
   eval (Pi sty tty)    g = VPi (eval sty g) (Scope g tty)
   eval (Lam t)         g = VLam (Scope g t)
 
+val :: Eval t => t Zero w -> Val w
+val t = eval t E0
+
 etaquote :: Worldly w => Val w -> Val w -> Tm Zero w
 etaquote VSet          VSet          = Set
 etaquote VSet          (VPi dom cod) =
@@ -240,5 +255,6 @@ netaquote (NP x)    = (P x, reftype x)
 netaquote (f :$$ s) = case netaquote f of
   (f', VPi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
 
-idE :: Env n w
-idE = undefined
+instance Worldly w => Eq (Ne w) where
+  n == n' = fst (netaquote n) == fst (netaquote n')
+

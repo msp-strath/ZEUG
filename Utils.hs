@@ -1,5 +1,5 @@
 {-# LANGUAGE KindSignatures, DataKinds, EmptyCase, GADTs,
-             DeriveFunctor #-}
+             DeriveFunctor, StandaloneDeriving  #-}
 module Utils where
 
 data Nat = Zero | Suc Nat
@@ -9,6 +9,8 @@ type One = Suc Zero
 data Fin (n :: Nat) where
   FZero :: Fin (Suc n)
   FSuc  :: Fin n -> Fin (Suc n)
+
+deriving instance Eq (Fin n)
 
 absurd :: Fin Zero -> a
 absurd k = case k of {}

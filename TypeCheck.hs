@@ -11,41 +11,51 @@ import Unsafe.Coerce
 import Utils
 import Syntax
 
-type TC = Maybe
+data TC t w where
+  Yes :: t w -> TC t w
+  No  :: TC t w
 
-isType :: Worldly w => TERM w -> TC (Happy w)
-isType (En ety) = do
-  ty <- enType ety
-  case whnf ty of
-    Set -> return Happy
-    _   -> fail "barf"
-isType Set    = return Happy
-isType (Pi sty tty) = do
-  isType sty
-  sty !- \ x -> isType (tty // x)
-isType _ = fail "not a type"
+(>>>=) :: TC s w -> (s w -> TC t w) -> TC t w
+Yes s >>>= f = f s
+No    >>>= _ = No
 
-whnf :: TERM w -> TERM w
-whnf = id
+instance Dischargeable f g => Dischargeable (TC f) (TC g) where
+  discharge x No      = No
+  discharge x (Yes f) = Yes (discharge x f)
 
-(>:>) :: TYPE w -> TERM w -> TC ()
-(>:>) ty t = case whnf ty of
-  En ety -> undefined
-  Set -> isType t
-  Pi sty tty -> undefined
-  _ -> fail "not a type"
-  
+isType :: Worldly w => TERM w -> TC Happy w
+isType (En ety) =
+  enType ety >>>= \ ty ->
+    case ty of
+      VSet -> Yes Happy
+      _    -> No
+isType Set      = Yes Happy
+isType (Pi sty tty) = 
+  goodType sty >>>= \ sty ->
+    sty !- \ x -> isType (tty // P x)
+isType _ = No
 
-hdType :: Hd Zero w -> TC (TYPE w)
-hdType = undefined
+goodType :: Worldly w => TERM w -> TC Val w
+goodType t = isType t >>>= \ _ -> Yes (val t)
 
-($:) :: (En Zero w, TYPE w) -> TERM w -> TC (TYPE w)
-($:) = undefined
+(>:>) :: Worldly w => Val w -> TERM w -> TC Happy w
+VSet        >:> t     = isType t -- won't work with hierarchy
+VPi dom cod >:> Lam t = dom !- \ x -> (wk cod $/ Ne (NP x)) >:> (t // P x)
+want        >:> En e  = enType e >>>= \ got -> got `subType` want
+_           >:> _      = No
 
-enType :: En Zero w -> TC (TYPE w)
-enType (h :$ sz) = hdType h >>= \ ty -> go (h,ty) sz where
-  go (h,ty) B0        = return ty
-  go (h,ty) (sz :< s) = do
-    ety <- go (h,ty) sz
-    (h :$ sz, ety) $: s
+goodTerm :: Worldly w => Val w -> TERM w -> TC Val w
+ty `goodTerm` t = ty >:> t >>>= \ _ -> Yes (val t)
 
+enType :: Worldly w => ELIM w -> TC Val w
+enType (P x)    = Yes (reftype x)
+enType (f :$ s) = enType f >>>= \ ty -> case ty of
+  VPi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod $/ vs)
+
+subType :: Worldly w => Val w -> Val w -> TC Happy w
+VSet `subType` VSet = Yes Happy
+VPi dom0 cod0 `subType` VPi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
+  dom1 !- \ x -> let vx = Ne (NP x) in (wk cod0 $/ vx) `subType` (wk cod1 $/ vx)
+Ne e0 `subType` Ne e1 = if e0 == e1 then Yes Happy else No
+_     `subType` _     = No
+                                       
