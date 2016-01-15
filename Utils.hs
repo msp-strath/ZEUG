@@ -11,6 +11,7 @@ data Fin (n :: Nat) where
   FSuc  :: Fin n -> Fin (Suc n)
 
 deriving instance Eq (Fin n)
+deriving instance Show (Fin n)
 
 absurd :: Fin Zero -> a
 absurd k = case k of {}

@@ -1,9 +1,9 @@
 {-# LANGUAGE RankNTypes, DataKinds, KindSignatures, GADTs,
              MultiParamTypeClasses, FunctionalDependencies,
              TypeFamilies, PolyKinds, UndecidableInstances,
-             FlexibleInstances, ScopedTypeVariables #-}
+             FlexibleInstances, ScopedTypeVariables, StandaloneDeriving #-}
 module Syntax(
-  World(),
+  World(..),
   Worldly,
   Happy(..),
   Ref(reftype), -- not exporting refname
@@ -49,7 +49,7 @@ data En (n :: Nat)(w :: World) where
   P     :: Ref w -> En n w
   (:$)  :: En n w -> Tm n w -> En n w
   (:::) :: Tm n w -> Tm n w -> En n w -- type annotations
-  deriving Eq
+  deriving (Eq, Show)
 
 
 data Tm (n :: Nat)(w :: World) where
@@ -59,7 +59,7 @@ data Tm (n :: Nat)(w :: World) where
   Lam :: Tm (Suc n) w -> Tm n w
   -- elimination forms
   En  :: En n w -> Tm n w
-  deriving Eq
+  deriving (Eq, Show)
 -- free variable management
 
 class Worldly (w :: World) where
@@ -71,7 +71,7 @@ instance Worldly W0 where
 instance Worldly w => Worldly (Bind w) where
   next (_ :: Proxy (Bind w)) = next (Proxy :: Proxy w) + 1
 
-data Ref w = Ref {refname :: Int , reftype :: Val w}
+data Ref w = Ref {refname :: Int , reftype :: Val w} deriving Show
 -- export only projection reftype and eq instance defined on ints only
 
 instance Eq (Ref w) where
@@ -217,18 +217,24 @@ data Env :: Nat -> World -> * where
   E0 :: Env Zero w
   ES :: Env n w -> Val w -> Env (Suc n) w
 
+deriving instance Show (Env n w)
+
 data Ne :: World -> * where
   NP    :: Ref w -> Ne w
   (:$$) :: Ne w -> Val w -> Ne w
+  deriving Show
   
 data Val :: World -> * where
   Ne    :: Ne w -> Val w
   VSet  :: Val w
   VPi   :: Val w -> Scope w -> Val w
   VLam  :: Scope w -> Val w
+  deriving Show
 
 data Scope :: World -> * where
   Scope :: Env n w -> Tm (Suc n) w -> Scope w
+
+deriving instance Show (Scope w)
 
 ($/) :: Scope w -> Val w -> Val w
 Scope g t $/ v = eval t (ES g v)
