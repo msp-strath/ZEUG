@@ -14,8 +14,8 @@ import Syntax
 type TC = Maybe
 
 isType :: Worldly w => TERM w -> TC (Happy w)
-isType (En e) = do
-  ty <- enType e
+isType (En ety) = do
+  ty <- enType ety
   case whnf ty of
     Set -> return Happy
     _   -> fail "barf"
@@ -23,13 +23,18 @@ isType Set    = return Happy
 isType (Pi sty tty) = do
   isType sty
   sty !- \ x -> isType (tty // x)
-isType _ = fail "blerk"
+isType _ = fail "not a type"
 
 whnf :: TERM w -> TERM w
 whnf = id
 
 (>:>) :: TYPE w -> TERM w -> TC ()
-(>:>) = undefined
+(>:>) ty t = case whnf ty of
+  En ety -> undefined
+  Set -> isType t
+  Pi sty tty -> undefined
+  _ -> fail "not a type"
+  
 
 hdType :: Hd Zero w -> TC (TYPE w)
 hdType = undefined
@@ -44,5 +49,3 @@ enType (h :$ sz) = hdType h >>= \ ty -> go (h,ty) sz where
     ety <- go (h,ty) sz
     (h :$ sz, ety) $: s
 
---(!-) :: TYPE -> (En Zero -> TC ()) -> TC ()
---(!-) = undefined

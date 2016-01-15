@@ -22,6 +22,7 @@ module Syntax(
 import Utils
 import Unsafe.Coerce
 import Data.Proxy
+import Data.Maybe
 
 -- contexts of free variables
 data World = W0 | Bind World
@@ -175,3 +176,63 @@ body // x = varOp (Inst IdVO x) body
 
 wk :: (VarOperable i, WorldLE w w' ~ True) => i n w -> i n w'
 wk = unsafeCoerce
+
+-- evaluation
+data Env :: Nat -> World -> * where
+  E0 :: Env Zero w
+  ES :: Env n w -> Val w -> Env (Suc n) w
+
+elookup :: Fin n -> Env n w -> Val w
+elookup FZero    (ES g v) = v
+elookup (FSuc i) (ES g v) = elookup i g
+
+data Val :: World -> * where
+  VSet  :: Val w
+  VPi   :: Val w -> Scope w -> Val w
+  VLam  :: Scope w -> Val w
+  (:$$) :: Ref w -> Bwd (Val w) -> Val w
+
+data Scope :: World -> * where
+  Scope :: Env n w -> Tm (Suc n) w -> Scope w
+
+($/) :: Scope w -> Val w -> Val w
+Scope g t $/ v = eval t (ES g v)
+
+eval :: Tm n w -> Env n w -> Val w
+eval (En (hd :$ ts)) g = heval hd g `vappS` bmap (\t -> eval t g) ts
+eval Set             g = VSet
+eval (Pi sty tty)    g = VPi (eval sty g) (Scope g tty)
+eval (Lam t)         g = VLam (Scope g t)
+
+vapp :: Val w -> Val w -> Val w
+VLam s     `vapp` v = s $/ v
+(x :$$ vs) `vapp` v = x :$$ (vs :< v)
+
+vappS :: Val w -> Bwd (Val w) -> Val w
+vappS hd B0 = hd
+vappS hd (vs :< v) = (vappS hd vs) `vapp` v
+                        
+heval :: Hd n w -> Env n w -> Val w
+heval (V x)      g = elookup x g
+heval (P x)      g = x :$$ B0
+heval (t ::: ty) g = eval t g
+
+betaquote :: Val w -> Tm Zero w
+betaquote = undefined
+
+etaquote :: Worldly w => Val w -> Val w -> Tm Zero w
+etaquote VSet          VSet          = Set
+etaquote VSet          (VPi dom cod) =
+  Pi (etaquote VSet dom) $
+     fromJust $ etaquote VSet dom !- \ x ->
+       return $ etaquote VSet (cod $/ undefined)
+etaquote (VPi dom cod) f             = undefined
+--  Lam $ etaquote VSet dom !- \ x -> etaquote (cod $/ x) (vapp f x)
+etaquote (x :$$ vs)    t = undefined
+etaquote _             _ = undefined
+
+idE :: Env n w
+idE = undefined
+
+
+-- norm :: Tm m w -> T 
