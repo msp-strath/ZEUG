@@ -67,7 +67,10 @@ smallEn
   <|>  grp "(" (gap *> bigEn <* gap) ")"
 
 
-data RawTree = RawTm :& [RawTree] deriving Show
+data RawTree = ([Token], RawTm) :& [RawTree] deriving Show
 
 rawTreeFormat :: Format RawTree
 rawTreeFormat = Format (:&) (gap *> bigTm <* gap) rawTreeFormat
+
+rawTest :: String -> [[RawTree]]
+rawTest = document rawTreeFormat . layout
