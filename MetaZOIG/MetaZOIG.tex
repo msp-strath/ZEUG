@@ -1,0 +1,235 @@
+\documentclass{article}
+\usepackage{upgreek}
+\usepackage{stmaryrd}
+
+\begin{document}
+\title{\textsf{ZOIG} Metalogic}
+\author{Conor, Fred, Guillaume, James}
+\maketitle
+
+\section{Syntax and Evaluation}
+
+\newcommand{\neu}{\underline}
+\newcommand{\lam}[1]{\uplambda #1.\,}
+\newcommand{\quo}{\textrm{'}}
+
+We have mutually defined syntactic categories for `positive' things
+representing canonical forms and `negative' things which have the potential
+to compute. This is not exactly the `polarity' that focusing people talk about,
+but it allows us to use some symbols to refer to a useful distinction.
+
+Terms($+$) and eliminations($-$):
+\[
+\begin{array}[t]{rrl@{\quad}l}
+S,T,s,t & ::= & \neu e    & \mbox{elimination}\\
+        &   | & \quo c    & \mbox{constant}\\
+        &   | & [s, t]    & \mbox{pair}\\
+        &   | & \lam {} t & \mbox{abstraction}\\
+\end{array}
+\qquad
+\begin{array}[t]{rrl@{\quad}l}
+E,F,e,f & ::= & x & \mbox{name}\\
+        &   | & f\:s & \mbox{action}\\
+        &   | & i & \mbox{index}\\
+        &   | & t : T & \mbox{cut}\\
+\end{array}
+\]
+
+Informally, let us write $\lam x t$ for the correspondingly de Bruijn indexed version. Constants are tokens or a blank (`nil').
+We may use LISP-like conveniences.
+Tidy
+$[\vec{s},[\vec{t}]]$ as $[\vec{s}\: \vec{t}]$.
+Tidy $[\vec{s},\quo]$ as $[\vec{s}]$.
+Tidy $\quo$ as $[]$.
+
+Values($+$) and neutrals($-$):
+\[
+\begin{array}[t]{rrl@{\quad}l}
+U,V,u,v & ::= & \neu n    & \mbox{neutral}\\
+        &   | & \quo c    & \mbox{constant}\\
+        &   | & [u, v]    & \mbox{pair}\\
+        &   | & \lam {[\gamma]} t & \mbox{abstraction}\\
+\end{array}
+\qquad
+\begin{array}[t]{rrl@{\quad}l}
+M,N,m,n & ::= & x & \mbox{name}\\
+        &   | & n\:u & \mbox{action}\\
+\end{array}
+\]
+
+\newcommand{\ev}[1]{\llbracket #1 \rrbracket}
+Evaluation:
+\[
+\begin{array}[t]{rcl}
+\ev {\neu e} \gamma & = & \ev e \gamma \\
+\ev {\quo c} \gamma & = & \quo c \\
+\ev {[s, t]} \gamma & = & [\ev s \gamma, \ev t \gamma] \\
+\ev {\lam {} t} \gamma & = & \lam{[\gamma]} t \\
+\end{array}
+\qquad
+\begin{array}[t]{rcl}
+\ev x \gamma & = & x \\
+\ev {f\:s} \gamma & = & \ev f \gamma \cdot \ev s \gamma \\
+\ev i \gamma & = & \gamma.i \\
+\ev {t : T} \gamma & = & \ev t \gamma\\
+\end{array}
+\]
+
+Action:
+\[\begin{array}{r@{\cdot}lcl}
+\neu n & u & = & \neu {n\:u}
+\end{array}\]
+
+Action is a thing we need to extend.
+
+
+\section{Judgments and Properties}
+
+\newcommand{\herald}{-\!\!:}
+\newcommand{\lay}[2]{\begin{array}[t]{@{}l@{}}#1\;\herald\\ %
+  \quad\begin{array}[t]{@{}l@{}}#2\end{array}\end{array}}
+
+\newcommand{\type}{\textsc{type}\;}
+\newcommand{\judgment}{\textsc{judgment}\;}
+\newcommand{\pve}{\mbox{$+$}}
+\newcommand{\nve}{\mbox{$+$}}
+
+Judgments are statements about things. A judgment is a formula with some places for the things. When we declare a judgment form, we give its template, marking the places clearly with parentheses. Inside the parentheses, we indicate the \emph{mode} of the place: $?$ for input, $!$ for output; we indicate the \emph{phase} of the place, by writing $\$$ if we are expecting a syntactic object or nothing, if we expect a value; we indicate whether the place is for positive or negative things;
+we name the thing in the place. For example, we may propose that a positive syntactic object is a type.
+\[
+\lay{\judgment \type (?\$\pve\:S)}{}
+\]
+(Yes, I know it looks like swearing.)
+Indented below (as signalled by the `layout herald', $\herald$ (depicting a horizontal thing followed by some vertical things), are the preconditions about
+the inputs and the postconditions about the outputs.
+For type formation, there are no such conditions. We refer to syntactic inputs
+as \emph{subjects} of the judgment: the judgment's purpose is to determine their validity. The value inputs should be validated in order to propose the judgment in the first place. For example, the type checking judgment must have a valid type.
+\[
+\lay{\judgment (?\pve\: S) \ni (?\$\pve\:s)}
+  {\type S}
+\]
+How to check such a declaration for sanity. Every variable which stands for a value
+input must be used as the subject of a premise. Reading down the premises, we regard
+$S$ as syntactic until it has been the subject of a judgment, at which point we become entitled to its value.
+
+The type synthesis judgment delivers an output. We explain what must be true of it.
+\[
+\lay{\judgment  (?\$\nve\:s) \in (!\pve\:S)}
+  {\type S}
+\]
+
+
+Contexts ascribe properties to variables. 
+A property is something like $:S$ or $=s$, expressing some sort of relationship to
+a value. A context entry is a fresh variable to which some properties have been postfixed. We will need to explain what conditions are necessary for the formulation of a property and the ascription of it to a variable. For example, we might say
+\newcommand{\property}{\textsc{property}\;}
+\newcommand{\ensures}{\;\textsc{ensures}\;}
+\[
+\lay{\property x : (S)\ensures x\in S}
+  {\type S}
+\]
+In effect, we're describing `context validity'. When we declare
+a property, we must give their embedding into judgments, where the components of the property must be used in output mode (for we shall have looked them up in the context). We acquire automatically the rules which explain when judgments hold of variables, and we are otherwise forbidden to write rules which examine the context.
+In doing so, we obtain stability under substitution, effectively the lifting of substitution from syntax to derivations.
+
+
+\section{Rules}
+
+A rule explains how to deduce one \emph{conclusion} judgment from zero or more \emph{premise} judgments. Let us consider how to check whether rules make sense.
+
+We presume that the value inputs of the conclusion are valid as specified by the judgment form. The syntactic inputs may be matched against patterns appropriate to the syntactic category: every schematic variable used in such patterns must appear in the subject of at least (exactly?) one premise: once such a variable has been a subject, we may use it in value positions. We must ensure that the value inputs of the premises are valid; we may assume that the value outputs of premises are valid.
+We must ensure that the value outputs of the conclusion are valid, and that information flows causally. For example,
+\[
+\lay{\type [\quo\Uppi\:S\:\lam x T]}
+   {\type S \\ x:S\vdash \type T}
+\]
+Here, we explain when the syntactic form of a $\Uppi$-type can be considered a type. Once $S$ has been validated as a type, we can form the property $:S$ and thus extend the context with a fresh variable which instantiates the de Bruijn index in $T$.
+We are \emph{not} saying that the codomain of a $\Uppi$-type can be any old first class function: quite the reverse, we are saying that this is a syntactic form which binds a variable. We may, however, say which uses of binding can be given $\Uppi$-types.
+\[
+\lay{[\quo\Uppi\:S\:\lam x T]\ni \lam x t}
+   {x:S\vdash T\ni t}
+\]
+Here we make essential use of the assumption that the input is valid. Inverting,
+we recover exactly what we need to ensure that the context extension is valid and the input of the premise is valid in that extended context.
+For applications, we then have
+\[
+\lay{f\:s\in \{x = s:S\}T}
+  {f\in [\quo\Uppi\:S\:\lam x T]\\ S\ni s}
+\]
+What's going on with that substitution? You can read the rules in a `small-step' way as being all about terms, and close judgments over appropriately directed computations: you can precompute inputs and post compute outputs. Or you can read them in a `big-step' way, regarding the substitution as hereditary, acting on values.
+But why do we know that the resulting type is well formed? We need two things.
+\[
+\lay{x\in S}{x:S} \qquad\qquad
+\lay{s:S\in S}{\type S\\ S\ni s}
+\]
+The first of these we get for free when we declare the property $:S$. The second
+we may add. Substitution is justified when the assumptions made about the variable hold of the thing substituted for it.
+
+
+\section{Actions from $\beta$-Rules}
+
+How do we specify computation?
+
+\newcommand{\betar}{\textsc{beta}\;} 
+We explain what happens when a \emph{typed} term is applied to another term.
+The usual $\beta$-rule becomes
+\[
+\betar (\lam x t : [\quo\Uppi\:S\:\lam x T])\:s =
+        \{x = s:S\}(t : T)
+\]
+How do we sanity-check such a thing? For a start, we have to check that the type information is used only to deliver other type information. That means we can extract the corresponding untyped value action.
+\[
+  (\lam{[\gamma]}t)\cdot v = \ev t (\gamma,v)
+\]
+
+It should be acceptable to allow the same untyped action from multiple typed actions. We might introduce some other function type, but we'd have to give it the same $\beta$-rule.
+
+
+\section{Quotation and $\eta$-Rules}
+
+The rules give rise to a default quotation procedure. If I have judgment which holds, I should be able to replace its subjects by their values, then reconstruct a judgment which also holds. Whichever rule typechecks abstractions must tell us how to generate the fresh variable which we can use to extend the environment in a functional value.
+
+\newcommand{\etar}{\textsc{eta}\;} 
+However, we sometimes want to override that default. We write rules which
+put the equations defining quotation in the places for the subjects.
+For example
+\[
+\lay{\etar [\quo\Uppi\:S\:\lam x T] \ni (f = \lam x t)}
+    {x:S \vdash T \ni (f\:x = t)}
+\]
+How do we sanity-check that?
+
+
+\section{Example: $\Upsigma$-types}
+
+Let's give the theory of $\Upsigma$-types in this style. Formation and introduction:
+\[
+\lay{\type[\quo\Upsigma\:S\:\lam x T]}
+    {\type S \\ x:S\vdash \type T}
+\qquad
+\lay{[\quo\Upsigma\:S\:\lam x T] \ni [s, t]}
+    {S\ni s\\ \{x=s:S\}T \ni t}
+\]
+Two specific applications are permitted.
+\newcommand{\fst}{\quo\mathsf{fst}}
+\newcommand{\snd}{\quo\mathsf{snd}}
+\[
+\lay{n\:\fst \in S}
+  {n\in [\quo\Upsigma\:S\:\lam x T]}
+\qquad
+\lay{n\:\snd \in \{x=n\:\fst\}T}
+  {n\in [\quo\Upsigma\:S\:\lam x T]}
+\]
+The associated actions are delivered by
+\[
+\betar ([s, t]:[\quo\Upsigma\:S\:\lam x T])\:\fst = s:S
+\qquad
+\betar ([s, t]:[\quo\Upsigma\:S\:\lam x T])\:\snd = t:\{x=s:S\}T
+\]
+The quotation behaviour is
+\[
+\lay{\etar [\quo\Upsigma\:S\:\lam x T] \ni (p = [s, t])}
+  {S\ni (p\:\fst = s)\\ \{x=p\:\fst\}T\ni (p\:\snd = t)}
+\]
+
+\end{document}

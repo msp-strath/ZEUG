@@ -1,11 +1,13 @@
 syntax term Q, R, S, T, q, r, s, t  -:
   [e]
   (x : S) -> T 
+  \ x -> t
   (x : S) * T 
+  s , t
   S = T
   a {Q} b
-  \ x -> t
-  s , t
+  <i> t
+  [S - T | f - g | q]
 
 syntax elimination E, F, e, f  -:
   x
@@ -14,6 +16,7 @@ syntax elimination E, F, e, f  -:
   f fst
   f snd
   s:S
+  [|S - T | f - g | q|] p p'
 
 syntax point p  -:
   i
@@ -77,7 +80,7 @@ TYPE S = T  -:
   TYPE S
   TYPE T
 
-R = T :> \ i -> S  -:
+R = T :> <i> S  -:
   i |- TYPE T
   S[0/i] == R
   S[1/i] == T
@@ -98,6 +101,10 @@ POINT 0 -:
 POINT 1 -:
 POINT i -:
   i in context
+POINT i[p0-p1] -:
+  i in context
+  POINT p0
+  POINT p1
 
 TYPE a {Q} b  -:
   [Q 0] END a
@@ -107,7 +114,7 @@ T END @  -:
 T END t  -:
   T :> t
 
-a {Q} b :> \ i -> t  -:
+a {Q} b :> <i> t  -:
   i |- [Q i] :> t
   [Q 0] :>  t[0/i] REFINES a 
   [Q 1] :>  t[1/i] REFINES b
@@ -122,12 +129,12 @@ q p <: Q p  -:
   POINT p
 
 defining p[p0-p1]  -:
-  0[p0-p1] = p0
-  1[p0-p1] = p1
-  i[p0-p1] = i[p0-p1]
-  i[p0'-p1'][p0-p1] = i[p0'[p0-p1]-p1'[p0-p1]]
-  i[p-p] = p
-  i[0-1] = i
+  0[p0-p1] == p0
+  1[p0-p1] == p1
+  i[p0-p1] == i[p0-p1]
+  i[p0'-p1'][p0-p1] == i[p0'[p0-p1]-p1'[p0-p1]]
+  i[p-p] == p
+  i[0-1] == i
 
 Q . Q' <: R = T  -:
   Q <: R = S
@@ -140,6 +147,29 @@ q . q' <: a {Q . Q'} d  -:
   [Q 1] == [Q' 0]
   [Q 1] :> [q 1] == [q 0]
 
+[S - T | f - g | q] <: S = T -:
+  TYPE S
+  TYPE T
+  S -> T :> f
+  T -> S :> g
+  (s : S)(t : T) -> (f s {<> T} t) = (s {<> S} g t)   -- really?
+
+defining [S - T | f - g | q] p -:
+  [S - T | f - g | q] 0 == S
+  [S - T | f - g | q] 1 == T
+  [S - T | f - g | q] p == S -:
+     S == T
+     f == g
+     q == \ s t -> <>(s {<> S} t)
+
+[|S - T | f - g | q|] p p' <: [S - T | f - g | q] p -> [S - T | f - g | q] p' -:
+  TYPE S
+  TYPE T
+  S -> T :> f
+  T -> S :> g
+  (s : S)(t : T) -> (f s {<> T} t) = (s {<> S} g t)   -- really?
+  POINT p
+  POINT p'
 
 s -@ Q <: s {Q}@  -:
   Q <: S = T
@@ -150,22 +180,34 @@ Q @- t <: @{Q} t  -:
   T :> t
 
 defining ~Q  -:
-  ~Q = \ i -> Q i[1-0]
+  ~Q = <i> Q i[1-0]
 
 defining Q @- t  -:
   Q @- t = ~(t -@ ~Q)
 
+defining S(p-p')  -:
+  S(p-p') = <j> S(j[p-p'])
+
 defining t-@ Q  -:
-  f -@ (\ i -> (x : S(i)) -> T(i,x)) =
-    \ i -> \ x ->
-      let eS = (\ j -> S(j[0-i])) @- x
-          eT = f (eS 0) -@ (\ j -> T(j[0-i],eS j))
+  f -@ (<i> (x : S(i)) -> T(i,x)) i ==
+    \ x ->
+      let eS = S(0-i) @- x
+          eT = f (eS 0) -@ (<j> T(j[0-i],eS j))
       in  eT 1
-  e -@ (\ i -> (x : S(i)) * T(i,x)) =
-    \ i ->
-      let eS = e fst -@ (\ j -> S(j[0-i]))
-          eT = e snd -@ (\ j -> T(j[0-i],eS j))
+  e -@ (<i> (x : S(i)) * T(i,x)) i ==
+      let eS = e fst -@ S(0-i)
+          eT = e snd -@ (<j> T(j[0-i],eS j))
       in  eS 1 , eT 1
-  e -@ (Q . Q') = let e' = e -@ Q in e' . (e' 1 -@ Q')
-  E -@ (\ i -> A(i) = B(i)) =
-    \ i -> (\ j -> A(j[i-0])) . E . (\ j -> B(j[0-i]))
+  e -@ (Q . Q') i == let e' = e -@ Q in e' . (e' 1 -@ Q') i
+  E -@ (<i> A(i) = B(i)) i ==
+    A(i-0) . E . B(0-i)
+  e -@ (<i> a(i) {Q(i)} b(i)) i ==
+    a(i-0) . e . b(0-i)
+  e -@ (<i> [S - T | f - g | q] p(i)) i ==
+    f e     if p(0) = 0 and p(i) = 1
+    g e     if p(0) = 1 and p(i) = 0
+    e       if p(0) = p(i)
+    e       if S == T, f == q, q == \ s t -> <>(s {<> S} t)
+
+
+
