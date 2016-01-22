@@ -1,7 +1,8 @@
 {-# LANGUAGE RankNTypes, DataKinds, KindSignatures, GADTs,
              MultiParamTypeClasses, FunctionalDependencies,
              TypeFamilies, PolyKinds, UndecidableInstances,
-             FlexibleInstances, ScopedTypeVariables, StandaloneDeriving #-}
+             FlexibleInstances, ScopedTypeVariables, StandaloneDeriving,
+             PatternSynonyms #-}
 module Syntax(
   World(..),
   Worldly,
@@ -22,12 +23,13 @@ module Syntax(
   Val(..),
   Ne(..),
   ($$),
+  pattern Pi,pattern VPi,pattern Sg,pattern VSg,pattern Set,pattern VSet,pattern Fst, pattern Snd, pattern NFst,pattern NSnd,
   vfst,
   vsnd,
   ($/),
   etaquote
   ) where
-import Utils
+import Utils hiding (VNil) -- bad
 import Unsafe.Coerce
 import Data.Proxy
 import Data.Maybe
@@ -47,24 +49,39 @@ data Happy :: World -> * where
 
 -- syntax indexed by contexts of bound and free variables
 
+data Phase = Syn Nat | Sem
+
 data En (n :: Nat)(w :: World) where
   V     :: Fin n -> En n w
   P     :: Ref w -> En n w
   (:$)  :: En n w -> Tm n w -> En n w
-  Fst, Snd :: En n w -> En n w
+  -- Fst, Snd :: En n w -> En n w
   (:::) :: Tm n w -> Tm n w -> En n w -- type annotations
   deriving (Eq, Show)
 
 
 data Tm (n :: Nat)(w :: World) where
-  -- canonical things
-  Set :: Tm n w
-  Pi, Sg :: Tm n w -> Tm (Suc n) w -> Tm n w
-  Lam :: Tm (Suc n) w -> Tm n w
+  -- building blocks
+  Atom :: String -> Tm n w
   (:&) :: Tm n w -> Tm n w -> Tm n w
+  Lam :: Tm (Suc n) w -> Tm n w
   -- elimination forms
   En  :: En n w -> Tm n w
   deriving (Eq, Show)
+
+infixr 4 :&
+
+-- canonical things
+pattern Nil = Atom ""
+pattern Set = Atom "Set"
+-- Pi, Sg :: Tm n w -> Tm (Suc n) w -> Tm n w
+pattern Pi s t = Atom "Pi" :& s :& Lam t :& Nil
+pattern Sg s t = Atom "Sg" :& s :& Lam t :& Nil
+
+-- elimination forms
+pattern Fst p = p :$ Atom "Fst"
+pattern Snd p = p :$ Atom "Snd"
+
 -- free variable management
 
 class Worldly (w :: World) where
@@ -138,15 +155,12 @@ instance VarOperable En where
       -- either we have found the right one, or we can run  f on an
       -- old one
   varOp f (hd :$ tl) = varOp f hd :$ varOp f tl
-  varOp f (Fst t)    = Fst (varOp f t)
-  varOp f (Snd t)    = Snd (varOp f t)  
 instance VarOperable Tm where
   varOp f (En e)   = En (varOp f e)
-  varOp f Set      = Set
-  varOp f (Pi s t) = Pi (varOp f s) (varOp (Weak f) t)
-  varOp f (Sg s t) = Sg (varOp f s) (varOp (Weak f) t)
-  varOp f (Lam t)  = Lam (varOp (Weak f) t)
+  varOp f (Atom s) = Atom s
   varOp f (t :& u) = (varOp f t :& varOp f u)
+  varOp f (Lam t)  = Lam (varOp (Weak f) t)
+
 
 -- how to yank something that's constructed under a binder back out
 -- from under that binder turning the free variable into a de Bruijn variable
@@ -230,17 +244,29 @@ deriving instance Show (Env n w)
 data Ne :: World -> * where
   NP    :: Ref w -> Ne w
   (:$$) :: Ne w -> Val w -> Ne w
-  NFst, NSnd :: Ne w -> Ne w
   deriving Show
   
 data Val :: World -> * where
   Ne    :: Ne w -> Val w
-  VSet  :: Val w
-  VPi,VSg :: Val w -> Scope w -> Val w
-  VLam  :: Scope w -> Val w
+  VAtom :: String -> Val w
   (:&&) :: Val w -> Val w -> Val w
+  VLam  :: Scope w -> Val w
   deriving Show
 
+infixr 4 :&&
+
+-- canonical things
+pattern VNil = VAtom ""
+pattern VSet = VAtom "Set"
+-- VPi,VSg :: Val w -> Scope w -> Val w
+pattern VPi s t = VAtom "Pi" :&& s :&& VLam t :&& VNil
+pattern VSg s t = VAtom "Sg" :&& s :&& VLam t :&& VNil
+
+-- stuck things
+pattern NFst p = p :$$ VAtom "Fst"
+pattern NSnd p = p :$$ VAtom "Snd"
+
+-- a closed closure
 data Scope :: World -> * where
   Scope :: Env n w -> Tm (Suc n) w -> Scope w
 
@@ -250,16 +276,14 @@ deriving instance Show (Scope w)
 Scope g t $/ v = eval t (ES g v)
 
 ($$) :: Val w -> Val w -> Val w
-VLam s $$ v = s $/ v
-Ne n   $$ v = Ne (n :$$ v)
+Ne n      $$ v = Ne (n :$$ v)
+VLam s    $$ v = s $/ v
+(v :&& w) $$ VAtom "Fst" = v
+(v :&& w) $$ VAtom "Snd" = w
 
-vfst :: Val w -> Val w
-vfst (v :&& w) = v
-vfst (Ne n)    = Ne (NFst n)
-
-vsnd :: Val w -> Val w
-vsnd (v :&& w) = w
-vsnd (Ne n)    = Ne (NSnd n)
+vfst, vsnd :: Val w -> Val w
+vfst p = p $$ VAtom "Fst"
+vsnd p = p $$ VAtom "Snd"
 
 elookup :: Fin n -> Env n w -> Val w
 elookup FZero    (ES g v) = v
@@ -273,16 +297,13 @@ instance Eval En where
   eval (P x)      g = Ne (NP x)
   eval (t ::: ty) g = eval t g
   eval (f :$ s)   g = eval f g $$ eval s g
-  eval (Fst t)    g = vfst (eval t g)
-  eval (Snd t)    g = vsnd (eval t g)
   
 instance Eval Tm where
   eval (En e)          g = eval e g
-  eval Set             g = VSet
-  eval (Pi sty tty)    g = VPi (eval sty g) (Scope g tty)
-  eval (Sg sty tty)    g = VSg (eval sty g) (Scope g tty)
+  eval (Atom s)        g = VAtom s
+  eval (t :& u)        g = eval t g :&& eval u g  
   eval (Lam t)         g = VLam (Scope g t)
-  eval (t :& u)        g = eval t g :&& eval u g
+
   
 val :: Eval t => t Zero w -> Val w
 val t = eval t E0
@@ -301,12 +322,11 @@ etaquote _            (Ne e) = En $ fst (netaquote e)
 
 netaquote :: Worldly w => Ne w -> (En Zero w, Val w)
 netaquote (NP x)    = (P x, reftype x)
-netaquote (f :$$ s) = case netaquote f of
+netaquote (e :$$ s) = case netaquote e of
   (f', VPi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
-netaquote (NFst p)  = case netaquote p of
-  (p', VSg dom cod) -> (Fst p', dom)
-netaquote (NSnd p)  = case netaquote p of
-  (p', VSg dom cod) -> (Snd p', cod $/ Ne (NFst p))
+  (p', VSg dom cod) -> case s of
+    VAtom "Fst" -> (Fst p', dom)
+    VAtom "Snd" -> (Snd p', cod $/ Ne (NFst e))
 
 instance Worldly w => Eq (Ne w) where
   n == n' = fst (netaquote n) == fst (netaquote n')

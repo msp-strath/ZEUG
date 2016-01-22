@@ -11,6 +11,7 @@ import Unsafe.Coerce
 import Utils
 import Syntax
 
+-- our monad is on world-indexed sets
 data TC t w where
   Yes :: t w -> TC t w
   No  :: TC t w
@@ -43,25 +44,27 @@ goodType :: Worldly w => TERM w -> TC Val w
 goodType t = isType t >>>= \ _ -> Yes (val t)
 
 (>:>) :: Worldly w => Val w -> TERM w -> TC Happy w
-VSet        >:> t     = isType t -- won't work with hierarchy
-VPi dom cod >:> Lam t = dom !- \ x -> (wk cod $/ x) >:> (t // x)
+VSet        >:> t        = isType t -- won't work with hierarchy
+VPi dom cod >:> Lam t    = dom !- \ x -> (wk cod $/ x) >:> (t // x)
 VSg dom cod >:> (t :& u) = dom `goodTerm` t >>>= \ vt -> (cod $/ vt) >:> u
-want        >:> En e  = enType e >>>= \ got -> got `subType` want
-_           >:> _      = No
+want        >:> En e     = enType e >>>= \ got -> got `subType` want
+_           >:> _        = No
 
 goodTerm :: Worldly w => Val w -> TERM w -> TC Val w
 ty `goodTerm` t = ty >:> t >>>= \ _ -> Yes (val t)
 
 enType :: Worldly w => ELIM w -> TC Val w
 enType (P x)      = Yes (reftype x)
-enType (f :$ s)   = enType f >>>= \ ty -> case ty of
+enType (e :$ s)   = enType e >>>= \ ty -> case ty of
   VPi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod $/ vs)
-enType (Fst p)    = enType p >>>= \ ty -> case ty of
-  VSg dom cod -> Yes dom
-enType (Snd p)    = enType p >>>= \ ty -> case ty of
-  VSg dom cod -> Yes (cod $/ vfst (val p))
+  VSg dom cod -> case s of
+    Atom "Fst" -> Yes dom
+    Atom "Snd" -> Yes (cod $/ vfst (val e))
+    _ -> No
+  _ -> No
 enType (t ::: ty) = goodType ty >>>= \ vty -> vty >:> t >>>= \ _ -> Yes vty 
 
+-- subtype is just equality at the mo'
 subType :: Worldly w => Val w -> Val w -> TC Happy w
 VSet `subType` VSet = Yes Happy
 VPi dom0 cod0 `subType` VPi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
