@@ -29,7 +29,7 @@ module Syntax(
   ($/),
   etaquote
   ) where
-import Utils hiding (VNil) -- bad
+import Utils
 import Unsafe.Coerce
 import Data.Proxy
 import Data.Maybe
@@ -249,20 +249,6 @@ instance Weakenable Scope
 instance Weakenable (Tm p)
 
 instance Weakenable (En p)
-
--- data Ne :: World -> * where
---   NP    :: Ref w -> Ne w
---   (:$$) :: Ne w -> Val w -> Ne w
---   deriving Show
-  
--- data Val :: World -> * where
---   Ne    :: Ne w -> Val w
---   VAtom :: String -> Val w
---   (:&&) :: Val w -> Val w -> Val w
---   VLam  :: Scope w -> Val w
---   deriving Show
-
--- infixr 4 :&&
 
 ($/) :: Scope w -> Val w -> Val w
 Scope g t $/ v = eval t (ES g v)
