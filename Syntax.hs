@@ -7,7 +7,8 @@ module Syntax(
   World(..),
   Worldly,
   Happy(..),
-  Ref(reftype), -- not exporting refname
+  RefBinder(..),
+  Ref(refType), -- not exporting refName
   Extended(),
   extrRef,
   extend,
@@ -117,22 +118,24 @@ instance Worldly W0 where
 instance Worldly w => Worldly (Bind w) where
   next (_ :: Proxy (Bind w)) = next (Proxy :: Proxy w) + 1
 
-data Ref w = Ref {refname :: Int , reftype :: Val w}
--- export only projection reftype and eq instance defined on ints only
+data RefBinder w = Decl | Hole | Defn (Val w)
+
+data Ref w = Ref {refBinder :: RefBinder w, refName :: Int, refType :: Val w}
+-- export only projection refType and eq instance defined on ints only
 
 instance Show (Ref w) where
-  show = show . refname
+  show = show . refName
 
 instance Eq (Ref w) where
-  Ref i _ == Ref j _ = i == j
+  i == j = refName i == refName j
 
 data Extended :: World -> World -> * where
   EBind :: Ref (Bind u) -> Extended u (Bind u)
   -- one-step extension of u = G ; x : S |- G
 
 -- we don't make fresh variables we make fresh context extensions
-extend :: forall w . Worldly w => Val w -> Extended w (Bind w)
-extend ty = EBind (Ref (next (Proxy :: Proxy w)) (wk ty))
+extend :: forall w . Worldly w => (RefBinder w, Val w) -> Extended w (Bind w)
+extend (rb, ty) = EBind (Ref (wk rb) (next (Proxy :: Proxy w)) (wk ty))
 
 -- what is the new thing?
 extrRef :: Extended u v -> Ref v
@@ -189,7 +192,6 @@ instance VarOperable Tm where
   varOp f (t :& u)  = (varOp f t :& varOp f u)
   varOp f (Lam t)   = Lam (varOp (Weak f) t)
 
-
 -- how to yank something that's constructed under a binder back out
 -- from under that binder turning the free variable into a de Bruijn variable
 class Dischargeable (f :: World -> *)(g :: World -> *)
@@ -233,10 +235,10 @@ instance RefEmbeddable (Tm p) where
 
 -- this doesn't need to be in this module as it uses extend and extrRef
 (!-) :: (Worldly w , Dischargeable f g) =>
-        Val w -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
+        (RefBinder w, Val w) -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
                    (forall r . RefEmbeddable r => r w') -> f w') -> g w
-ty !- f = discharge x (f (emb (extrRef x))) where
-  x = extend ty
+p !- f = discharge x (f (emb (extrRef x))) where
+  x = extend p
 
 (//) :: (WorldLE w w' ~ True, VarOperable t) =>
         t (Syn One) w -> En (Syn Zero) w' -> t (Syn Zero) w'
@@ -251,6 +253,8 @@ instance Weakenable Scope
 instance Weakenable (Tm p)
 
 instance Weakenable (En p)
+
+instance Weakenable (RefBinder)
 
 ($/) :: Scope w -> Val w -> Val w
 Scope g t $/ v = eval t (ES g v)
@@ -274,7 +278,8 @@ class Eval t  where
 
 instance Eval En where
   eval (V x)      g = elookup x g
-  eval (P x)      g = En (P x)
+  eval (P x)      g | Defn v <- refBinder x = v
+                    | otherwise             = En (P x)
   eval (t ::: ty) g = eval t g
   eval (f :$ s)   g = eval f g $$ eval s g
   
@@ -291,17 +296,17 @@ val t = eval t E0
 etaquote :: Worldly w => Val w -> Val w -> Tm (Syn Zero) w
 etaquote Set          Set          = Set
 etaquote Set          (Pi dom cod) =
-  Pi (etaquote Set dom) $ dom !- \ x -> etaquote Set (wk cod $/ x)
+  Pi (etaquote Set dom) $ (Decl,dom) !- \ x -> etaquote Set (wk cod $/ x)
 etaquote Set          (Sg dom cod) =
-  Sg (etaquote Set dom) $ dom !- \ x -> etaquote Set (wk cod $/ x)
+  Sg (etaquote Set dom) $ (Decl,dom) !- \ x -> etaquote Set (wk cod $/ x)
 etaquote (Pi dom cod) f             = 
-  Lam $ dom !- \ x -> etaquote (wk cod $/ x) (wk f $$ x)
+  Lam $ (Decl,dom) !- \ x -> etaquote (wk cod $/ x) (wk f $$ x)
 etaquote (Sg dom cod) p             = let s = vfst p in
   etaquote dom s :& etaquote (cod $/ s) (vsnd p)
 etaquote _            (En e) = En $ fst (netaquote e)
 
 netaquote :: Worldly w => Ne w -> (En (Syn Zero) w, Val w)
-netaquote (P x)    = (P x, reftype x)
+netaquote (P x)    = (P x, refType x)
 netaquote (e :$ s) = case netaquote e of
   (f', Pi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
   (p', Sg dom cod) -> case s of
