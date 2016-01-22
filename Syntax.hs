@@ -39,10 +39,7 @@ type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
 
 -- contexts of free variables
-data World = W0 | Bind World
-
--- currently unneeded hack:
-newtype Fink (n :: Nat)(w :: World) = Fink {fink :: Fin n}
+data World = W0 | Bind World | Inner World
 
 -- syntax indexed by contexts of bound and free variables
 
@@ -108,19 +105,29 @@ pattern Fst p = p :$ Atom "Fst"
 pattern Snd p = p :$ Atom "Snd"
 
 -- free variable management
+type Name = [Int]
+type Root = (Bwd Int,Int)
 
 class Worldly (w :: World) where
-  next :: Proxy w -> Int 
+  root :: Proxy w -> Root
 
 instance Worldly W0 where
-  next _ = 0
+  root _ = (B0,0)
 
 instance Worldly w => Worldly (Bind w) where
-  next (_ :: Proxy (Bind w)) = next (Proxy :: Proxy w) + 1
+  root (_ :: Proxy (Bind w)) = fmap (+1) (root (Proxy :: Proxy w))
+
+instance Worldly w => Worldly (Inner w) where
+  root (_ :: Proxy (Inner w)) = case root (Proxy :: Proxy w) of
+    (iz,i) -> (iz :< i,0)
+
+next :: Worldly w => Proxy w -> Name
+next p = case root p of
+  (iz,i) -> iz <>> [i]
 
 data RefBinder w = Decl | Hole | Defn (Val w)
 
-data Ref w = Ref {refBinder :: RefBinder w, refName :: Int, refType :: Val w}
+data Ref w = Ref {refBinder :: RefBinder w, refName :: Name, refType :: Val w}
 -- export only projection refType and eq instance defined on ints only
 
 instance Show (Ref w) where
@@ -215,8 +222,9 @@ type family OR x y where
   OR x False = x
 
 type family WorldLT (w :: World)(w' :: World) :: Bool where
-  WorldLT w (Bind w') = WorldLE w w'
-  WorldLT w w'        = False
+  WorldLT w (Bind w')  = WorldLE w w'
+  WorldLT w (Inner w') = WorldLE w w'
+  WorldLT w w'         = False
 
 type family WorldLE (w :: World)(w' :: World) :: Bool where
   WorldLE w w' = OR (EQ w w') (WorldLT w w')

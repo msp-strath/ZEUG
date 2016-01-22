@@ -54,6 +54,14 @@ bmap f (xs :< x) = bmap f xs :< f x
 xs +<+ B0 = xs
 xs +<+ (ys :< y) = (xs +<+ ys) :< y
 
+(<><) :: Bwd x -> [x] -> Bwd x
+xs <>< (y : ys) = (xs :< y) <>< ys
+xs <>< []       = xs
+
+(<>>) :: Bwd x -> [x] -> [x]
+B0        <>> ys = ys
+(xs :< x) <>> ys = xs <>> (x : ys)
+
 -- indexed unit type
 data Happy :: k -> * where
   Happy :: Happy k
