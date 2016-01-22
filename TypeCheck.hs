@@ -29,7 +29,7 @@ isType :: Worldly w => TERM w -> TC Happy w
 isType (En ety) =
   enType ety >>>= \ ty ->
     case ty of
-      VSet -> Yes Happy
+      Set -> Yes Happy
       _    -> No
 isType Set      = Yes Happy
 isType (Pi sty tty) = 
@@ -44,9 +44,9 @@ goodType :: Worldly w => TERM w -> TC Val w
 goodType t = isType t >>>= \ _ -> Yes (val t)
 
 (>:>) :: Worldly w => Val w -> TERM w -> TC Happy w
-VSet        >:> t        = isType t -- won't work with hierarchy
-VPi dom cod >:> Lam t    = dom !- \ x -> (wk cod $/ x) >:> (t // x)
-VSg dom cod >:> (t :& u) = dom `goodTerm` t >>>= \ vt -> (cod $/ vt) >:> u
+Set        >:> t        = isType t -- won't work with hierarchy
+Pi dom cod >:> Lam t    = dom !- \ x -> (wk cod $/ x) >:> (t // x)
+Sg dom cod >:> (t :& u) = dom `goodTerm` t >>>= \ vt -> (cod $/ vt) >:> u
 want        >:> En e     = enType e >>>= \ got -> got `subType` want
 _           >:> _        = No
 
@@ -56,8 +56,8 @@ ty `goodTerm` t = ty >:> t >>>= \ _ -> Yes (val t)
 enType :: Worldly w => ELIM w -> TC Val w
 enType (P x)      = Yes (reftype x)
 enType (e :$ s)   = enType e >>>= \ ty -> case ty of
-  VPi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod $/ vs)
-  VSg dom cod -> case s of
+  Pi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod $/ vs)
+  Sg dom cod -> case s of
     Atom "Fst" -> Yes dom
     Atom "Snd" -> Yes (cod $/ vfst (val e))
     _ -> No
@@ -66,12 +66,12 @@ enType (t ::: ty) = goodType ty >>>= \ vty -> vty >:> t >>>= \ _ -> Yes vty
 
 -- subtype is just equality at the mo'
 subType :: Worldly w => Val w -> Val w -> TC Happy w
-VSet `subType` VSet = Yes Happy
-VPi dom0 cod0 `subType` VPi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
+Set `subType` Set = Yes Happy
+Pi dom0 cod0 `subType` Pi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
   dom1 !- \ x -> (wk cod0 $/ x) `subType` (wk cod1 $/ x)
-VSg dom0 cod0 `subType` VSg dom1 cod1 = dom0 `subType` dom1 >>>= \ _ ->
+Sg dom0 cod0 `subType` Sg dom1 cod1 = dom0 `subType` dom1 >>>= \ _ ->
   dom0 !- \ x -> (wk cod0 $/ x) `subType` (wk cod1 $/ x)
-Ne e0 `subType` Ne e1 = if e0 == e1 then Yes Happy else No
+En e0 `subType` En e1 = if e0 == e1 then Yes Happy else No
 _     `subType` _     = No
 
 yestest0 :: TC Val W0                        

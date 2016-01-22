@@ -23,7 +23,7 @@ module Syntax(
   Val(..),
   Ne(..),
   ($$),
-  pattern Pi,pattern VPi,pattern Sg,pattern VSg,pattern Set,pattern VSet,pattern Fst, pattern Snd, pattern NFst,pattern NSnd,
+  pattern Pi,pattern Sg,pattern Set,pattern Fst, pattern Snd,
   vfst,
   vsnd,
   ($/),
@@ -34,8 +34,8 @@ import Unsafe.Coerce
 import Data.Proxy
 import Data.Maybe
 
-type TERM = Tm Zero
-type ELIM = En Zero
+type TERM = Tm (Syn Zero)
+type ELIM = En (Syn Zero)
 
 -- contexts of free variables
 data World = W0 | Bind World
@@ -51,30 +51,56 @@ data Happy :: World -> * where
 
 data Phase = Syn Nat | Sem
 
-data En (n :: Nat)(w :: World) where
-  V     :: Fin n -> En n w
-  P     :: Ref w -> En n w
-  (:$)  :: En n w -> Tm n w -> En n w
-  -- Fst, Snd :: En n w -> En n w
-  (:::) :: Tm n w -> Tm n w -> En n w -- type annotations
-  deriving (Eq, Show)
+data En (p :: Phase)(w :: World) where
+  V     :: Fin n -> En (Syn n) w
+  P     :: Ref w -> En p w
+  (:$)  :: En p w -> Tm p w -> En p w
+  (:::) :: Tm (Syn n) w -> Tm (Syn n) w -> En (Syn n) w -- type annotations
 
+deriving instance Eq (En (Syn n) w)
+deriving instance Show (En (Syn n) w)
 
-data Tm (n :: Nat)(w :: World) where
+-- hopefully won't need this in a ghc > 8
+instance Show (En Sem n) where
+  show (P x) = "P " ++ show x
+  show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
+
+data Tm (p :: Phase)(w :: World) where
   -- building blocks
-  Atom :: String -> Tm n w
-  (:&) :: Tm n w -> Tm n w -> Tm n w
-  Lam :: Tm (Suc n) w -> Tm n w
+  Atom :: String -> Tm p w
+  (:&) :: Tm p w -> Tm p w -> Tm p w
+  Lam :: Body p w -> Tm p w
   -- elimination forms
-  En  :: En n w -> Tm n w
-  deriving (Eq, Show)
+  En  :: En p w -> Tm p w
 
+deriving instance Eq (Tm (Syn n) w)
+deriving instance Show (Tm (Syn n) w)
+deriving instance Show (Tm Sem w)
 infixr 4 :&
+
+type Val = Tm Sem
+type Ne  = En Sem
+
+type family Body (p :: Phase) ::  World -> * where
+  Body (Syn n) = Tm (Syn (Suc n))
+  Body Sem     = Scope
+
+-- a closed closure
+data Scope :: World -> * where
+  Scope :: Env n w -> Tm (Syn (Suc n)) w -> Scope w
+
+deriving instance Show (Scope w)
+
+data Env :: Nat -> World -> * where
+  E0 :: Env Zero w
+  ES :: Env n w -> Val w -> Env (Suc n) w
+
+deriving instance Show (Env n w)
 
 -- canonical things
 pattern Nil = Atom ""
 pattern Set = Atom "Set"
--- Pi, Sg :: Tm n w -> Tm (Suc n) w -> Tm n w
+-- Pi, Sg :: Tm p w -> Body p w -> Tm p w
 pattern Pi s t = Atom "Pi" :& s :& Lam t :& Nil
 pattern Sg s t = Atom "Sg" :& s :& Lam t :& Nil
 
@@ -117,16 +143,16 @@ thicken (EBind x) y | x == y    = Nothing
                     | otherwise = Just $ unsafeCoerce y
 -- if G ; x : S |- y : S /\ x /= y then G |- y : S
 
-class VarOperable (i :: Nat -> World -> *) where
-  varOp :: VarOp n m v w -> i n v -> i m w -- map
-  vclosed :: i Zero w -> i m w
+class VarOperable (i :: Phase -> World -> *) where
+  varOp :: VarOp n m v w -> i (Syn n) v -> i (Syn m) w -- map
+  vclosed :: i (Syn Zero) w -> i (Syn m) w
   vclosed = unsafeCoerce
   -- vclosed things can trivially weakened
   
 data VarOp (n :: Nat)(m :: Nat)(v :: World)(w :: World) where
   IdVO :: WorldLE v w ~ True => VarOp n n v w
   Weak :: VarOp n m v w -> VarOp (Suc n) (Suc m) v w
-  Inst :: VarOp n Zero v w -> En Zero w -> VarOp (Suc n) Zero v w
+  Inst :: VarOp n Zero v w -> En (Syn Zero) w -> VarOp (Suc n) Zero v w
   -- instantiates bound index 0 with a valid neutral term
   Abst :: VarOp Zero m u w -> Extended u v -> VarOp Zero (Suc m) v w
   -- turns the free variable introduced by the extension into a bound
@@ -135,7 +161,7 @@ data VarOp (n :: Nat)(m :: Nat)(v :: World)(w :: World) where
 instance VarOperable En where
   varOp f        (tm ::: ty)  = varOp f tm ::: varOp f ty
   varOp f        (V i) = either vclosed V (help f i) where
-    help :: VarOp n m v w -> Fin n -> Either (En Zero w) (Fin m)
+    help :: VarOp n m v w -> Fin n -> Either (En (Syn Zero) w) (Fin m)
     help IdVO       i        = Right i
     help (Weak f)   FZero    = Right FZero
     help (Weak f)   (FSuc i) = fmap FSuc (help f i)
@@ -146,7 +172,7 @@ instance VarOperable En where
 
   varOp f (P x) = either vclosed V (help f x) where
     help :: forall n m v w . VarOp n m v w -> Ref v ->
-            Either (En Zero w) (Fin m)
+            Either (En (Syn Zero) w) (Fin m)
     help IdVO       r = Left (wk (P r))
     help (Weak f)   r = fmap FSuc (help f r)
     help (Inst f h) r = help f r
@@ -168,7 +194,7 @@ class Dischargeable (f :: World -> *)(g :: World -> *)
   | g -> f , f -> g where
   discharge :: Extended u v -> f v -> g u
 
-instance Dischargeable (Tm Zero) (Tm (Suc Zero)) where
+instance Dischargeable (Tm (Syn Zero)) (Tm (Syn One)) where
   discharge x = varOp (Abst IdVO x)
 
 instance Dischargeable Happy Happy where
@@ -197,17 +223,11 @@ class RefEmbeddable t where
 instance RefEmbeddable Ref where
   emb = id
 
-instance RefEmbeddable (En n) where
+instance RefEmbeddable (En p) where
   emb = P
 
-instance RefEmbeddable (Tm n) where
+instance RefEmbeddable (Tm p) where
   emb = En . emb
-
-instance RefEmbeddable Ne where
-  emb = NP
-
-instance RefEmbeddable Val where
-  emb = Ne . emb
 
 -- this doesn't need to be in this module as it uses extend and extrRef
 (!-) :: (Worldly w , Dischargeable f g) =>
@@ -217,116 +237,88 @@ ty !- f = discharge x (f (emb (extrRef x))) where
   x = extend ty
 
 (//) :: (WorldLE w w' ~ True, VarOperable t) =>
-        t One w -> En Zero w' -> t Zero w'
+        t (Syn One) w -> En (Syn Zero) w' -> t (Syn Zero) w'
 body // x = varOp (Inst IdVO x) body
 
 class Weakenable (t :: World -> *) where
   wk :: WorldLE w w' ~ True => t w -> t w'
   wk = unsafeCoerce
 
-instance Weakenable Val
-
-instance Weakenable Ne
-
 instance Weakenable Scope
 
-instance Weakenable (Tm n)
+instance Weakenable (Tm p)
 
-instance Weakenable (En n)
+instance Weakenable (En p)
 
--- evaluation
-data Env :: Nat -> World -> * where
-  E0 :: Env Zero w
-  ES :: Env n w -> Val w -> Env (Suc n) w
-
-deriving instance Show (Env n w)
-
-data Ne :: World -> * where
-  NP    :: Ref w -> Ne w
-  (:$$) :: Ne w -> Val w -> Ne w
-  deriving Show
+-- data Ne :: World -> * where
+--   NP    :: Ref w -> Ne w
+--   (:$$) :: Ne w -> Val w -> Ne w
+--   deriving Show
   
-data Val :: World -> * where
-  Ne    :: Ne w -> Val w
-  VAtom :: String -> Val w
-  (:&&) :: Val w -> Val w -> Val w
-  VLam  :: Scope w -> Val w
-  deriving Show
+-- data Val :: World -> * where
+--   Ne    :: Ne w -> Val w
+--   VAtom :: String -> Val w
+--   (:&&) :: Val w -> Val w -> Val w
+--   VLam  :: Scope w -> Val w
+--   deriving Show
 
-infixr 4 :&&
-
--- canonical things
-pattern VNil = VAtom ""
-pattern VSet = VAtom "Set"
--- VPi,VSg :: Val w -> Scope w -> Val w
-pattern VPi s t = VAtom "Pi" :&& s :&& VLam t :&& VNil
-pattern VSg s t = VAtom "Sg" :&& s :&& VLam t :&& VNil
-
--- stuck things
-pattern NFst p = p :$$ VAtom "Fst"
-pattern NSnd p = p :$$ VAtom "Snd"
-
--- a closed closure
-data Scope :: World -> * where
-  Scope :: Env n w -> Tm (Suc n) w -> Scope w
-
-deriving instance Show (Scope w)
+-- infixr 4 :&&
 
 ($/) :: Scope w -> Val w -> Val w
 Scope g t $/ v = eval t (ES g v)
 
 ($$) :: Val w -> Val w -> Val w
-Ne n      $$ v = Ne (n :$$ v)
-VLam s    $$ v = s $/ v
-(v :&& w) $$ VAtom "Fst" = v
-(v :&& w) $$ VAtom "Snd" = w
+En n     $$ v          = En (n :$ v)
+Lam s    $$ v          = s $/ v
+(v :& w) $$ Atom "Fst" = v
+(v :& w) $$ Atom "Snd" = w
 
 vfst, vsnd :: Val w -> Val w
-vfst p = p $$ VAtom "Fst"
-vsnd p = p $$ VAtom "Snd"
+vfst p = p $$ Atom "Fst"
+vsnd p = p $$ Atom "Snd"
 
 elookup :: Fin n -> Env n w -> Val w
 elookup FZero    (ES g v) = v
 elookup (FSuc i) (ES g v) = elookup i g
 
 class Eval t  where
-  eval :: t n w -> Env n w -> Val w
+  eval :: t (Syn n) w -> Env n w -> Val w
 
 instance Eval En where
   eval (V x)      g = elookup x g
-  eval (P x)      g = Ne (NP x)
+  eval (P x)      g = En (P x)
   eval (t ::: ty) g = eval t g
   eval (f :$ s)   g = eval f g $$ eval s g
   
 instance Eval Tm where
   eval (En e)          g = eval e g
-  eval (Atom s)        g = VAtom s
-  eval (t :& u)        g = eval t g :&& eval u g  
-  eval (Lam t)         g = VLam (Scope g t)
+  eval (Atom s)        g = Atom s
+  eval (t :& u)        g = eval t g :& eval u g  
+  eval (Lam t)         g = Lam (Scope g t)
 
   
-val :: Eval t => t Zero w -> Val w
+val :: Eval t => t (Syn Zero) w -> Val w
 val t = eval t E0
 
-etaquote :: Worldly w => Val w -> Val w -> Tm Zero w
-etaquote VSet          VSet          = Set
-etaquote VSet          (VPi dom cod) =
-  Pi (etaquote VSet dom) $ dom !- \ x -> etaquote VSet (wk cod $/ x)
-etaquote VSet          (VSg dom cod) =
-  Sg (etaquote VSet dom) $ dom !- \ x -> etaquote VSet (wk cod $/ x)
-etaquote (VPi dom cod) f             = 
+etaquote :: Worldly w => Val w -> Val w -> Tm (Syn Zero) w
+etaquote Set          Set          = Set
+etaquote Set          (Pi dom cod) =
+  Pi (etaquote Set dom) $ dom !- \ x -> etaquote Set (wk cod $/ x)
+etaquote Set          (Sg dom cod) =
+  Sg (etaquote Set dom) $ dom !- \ x -> etaquote Set (wk cod $/ x)
+etaquote (Pi dom cod) f             = 
   Lam $ dom !- \ x -> etaquote (wk cod $/ x) (wk f $$ x)
-etaquote (VSg dom cod) p             = let s = vfst p in
+etaquote (Sg dom cod) p             = let s = vfst p in
   etaquote dom s :& etaquote (cod $/ s) (vsnd p)
-etaquote _            (Ne e) = En $ fst (netaquote e)
+etaquote _            (En e) = En $ fst (netaquote e)
 
-netaquote :: Worldly w => Ne w -> (En Zero w, Val w)
-netaquote (NP x)    = (P x, reftype x)
-netaquote (e :$$ s) = case netaquote e of
-  (f', VPi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
-  (p', VSg dom cod) -> case s of
-    VAtom "Fst" -> (Fst p', dom)
-    VAtom "Snd" -> (Snd p', cod $/ Ne (NFst e))
+netaquote :: Worldly w => Ne w -> (En (Syn Zero) w, Val w)
+netaquote (P x)    = (P x, reftype x)
+netaquote (e :$ s) = case netaquote e of
+  (f', Pi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
+  (p', Sg dom cod) -> case s of
+    Atom "Fst" -> (Fst p', dom)
+    Atom "Snd" -> (Snd p', cod $/ En (Fst e))
 
 instance Worldly w => Eq (Ne w) where
   n == n' = fst (netaquote n) == fst (netaquote n')
