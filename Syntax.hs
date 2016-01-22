@@ -43,10 +43,6 @@ data World = W0 | Bind World
 -- currently unneeded hack:
 newtype Fink (n :: Nat)(w :: World) = Fink {fink :: Fin n}
 
--- world relative unit type
-data Happy :: World -> * where
-  Happy :: Happy w
-
 -- syntax indexed by contexts of bound and free variables
 
 data Phase = Syn Nat | Sem
@@ -69,9 +65,9 @@ data Tm (p :: Phase)(w :: World) where
   -- building blocks
   Atom :: String -> Tm p w
   (:&) :: Tm p w -> Tm p w -> Tm p w
-  Lam :: Body p w -> Tm p w
+  Lam  :: Body p w -> Tm p w
   -- elimination forms
-  En  :: En p w -> Tm p w
+  En   :: En p w -> Tm p w
 
 deriving instance Eq (Tm (Syn n) w)
 deriving instance Show (Tm (Syn n) w)
@@ -281,7 +277,6 @@ instance Eval Tm where
   eval (Atom s)        g = Atom s
   eval (t :& u)        g = eval t g :& eval u g  
   eval (Lam t)         g = Lam (Scope g t)
-
   
 val :: Eval t => t (Syn Zero) w -> Val w
 val t = eval t E0

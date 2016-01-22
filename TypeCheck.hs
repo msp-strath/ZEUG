@@ -1,13 +1,11 @@
 --{-# OPTIONS -Wall -fwarn-incomplete-patterns #-}
 {-# LANGUAGE KindSignatures, DataKinds, ScopedTypeVariables, PolyKinds,
              UndecidableInstances, MultiParamTypeClasses,
-             FunctionalDependencies,
-             FlexibleInstances, GADTs, DeriveFunctor, RankNTypes, EmptyCase,
-             TypeFamilies #-}
+             FunctionalDependencies, TypeOperators,
+             FlexibleInstances, GADTs, DeriveFunctor, RankNTypes,
+             EmptyCase, TypeFamilies #-}
 module TypeCheck where
 
-import Data.Proxy
-import Unsafe.Coerce
 import Utils
 import Syntax
 
@@ -55,14 +53,19 @@ ty `goodTerm` t = ty >:> t >>>= \ _ -> Yes (val t)
 
 enType :: Worldly w => ELIM w -> TC Val w
 enType (P x)      = Yes (reftype x)
-enType (e :$ s)   = enType e >>>= \ ty -> case ty of
+enType (e :$ s)   = goodElim e >>>= \ (v :&: ty) -> case ty of
   Pi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod $/ vs)
   Sg dom cod -> case s of
     Atom "Fst" -> Yes dom
-    Atom "Snd" -> Yes (cod $/ vfst (val e))
+    Atom "Snd" -> Yes (cod $/ vfst v)
     _ -> No
   _ -> No
-enType (t ::: ty) = goodType ty >>>= \ vty -> vty >:> t >>>= \ _ -> Yes vty 
+enType (t ::: ty) =
+  goodType ty >>>= \ vty ->
+  vty >:> t   >>>= \ _ -> Yes vty 
+
+goodElim :: Worldly w => ELIM w -> TC (Val :* Val) w
+goodElim e = enType e >>>= \ vty -> Yes (val e :&: vty)
 
 -- subtype is just equality at the mo'
 subType :: Worldly w => Val w -> Val w -> TC Happy w
@@ -74,40 +77,3 @@ Sg dom0 cod0 `subType` Sg dom1 cod1 = dom0 `subType` dom1 >>>= \ _ ->
 En e0 `subType` En e1 = if e0 == e1 then Yes Happy else No
 _     `subType` _     = No
 
-yestest0 :: TC Val W0                        
-yestest0 = enType ((Lam (En (V FZero)) ::: Pi Set Set))
-
-yestest1 :: TC Val W0
-yestest1 = enType ((Lam (En (V FZero)) ::: Pi Set Set) :$ Set)
-
-yestest2 :: TC Val W0
-yestest2 = enType (Lam (Lam (En (V FZero))) ::: Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero))))))
-
-yestest3 :: TC Val W0
-yestest3 = enType (Lam (Lam (En (V FZero))) ::: Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero))))) :$ Set)
-
-yestest4 :: TC Val W0
-yestest4 = enType (Lam (Lam (En (V FZero))) ::: Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero))))) :$ Set :$ Set)
-
-yestest5 :: TC Val W0
-yestest5 = enType ((Set :& Set) ::: Sg Set Set)
-
-yestest6 :: TC Val W0
-yestest6 = enType (Fst ((Set :& Set) ::: Sg Set Set))
-
-yestest7 :: TC Val W0
-yestest7 = enType (Snd ((Set :& Set) ::: Sg Set Set))
-
-yestest8 :: TC Val W0
-yestest8 = enType ((Set :& Set) ::: Sg Set (En (V FZero)))
-
-yestest9 :: TC Val W0
-yestest9 = enType (Lam (En (Fst (V FZero))) ::: Pi (Sg Set Set) Set)
-
-valtest0 :: TERM W0
-valtest0 = etaquote (val ty) (val tm) where
-  tm = Lam (En (V FZero))
-  ty = Pi (Sg Set Set) (Sg Set Set)
-
-notest0 :: TC Val W0
-notest0 = enType ((Lam (En (V FZero)) ::: Set) :$ Set)

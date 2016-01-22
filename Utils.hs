@@ -1,5 +1,6 @@
 {-# LANGUAGE KindSignatures, DataKinds, EmptyCase, GADTs,
-             DeriveFunctor, StandaloneDeriving  #-}
+             DeriveFunctor, StandaloneDeriving, PolyKinds,
+             TypeOperators #-}
 module Utils where
 
 data Nat = Zero | Suc Nat deriving Show
@@ -52,3 +53,9 @@ bmap f (xs :< x) = bmap f xs :< f x
 (+<+) :: Bwd x -> Bwd x -> Bwd x
 xs +<+ B0 = xs
 xs +<+ (ys :< y) = (xs +<+ ys) :< y
+
+-- indexed unit type
+data Happy :: k -> * where
+  Happy :: Happy k
+
+data (:*) (s :: k -> *) (t :: k -> *) (i :: k) = s i :&: t i
