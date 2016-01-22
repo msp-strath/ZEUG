@@ -24,6 +24,7 @@ instance Dischargeable f g => Dischargeable (TC f) (TC g) where
   discharge x (Yes f) = Yes (discharge x f)
 
 isType :: Worldly w => TERM w -> TC Happy w
+isType (Let e ty) = isType (ty // e)
 isType (En ety) =
   enType ety >>>= \ ty ->
     case ty of
@@ -42,6 +43,7 @@ goodType :: Worldly w => TERM w -> TC Val w
 goodType t = isType t >>>= \ _ -> Yes (val t)
 
 (>:>) :: Worldly w => Val w -> TERM w -> TC Happy w
+ty         >:> Let e t  = ty >:> (t // e)
 Set        >:> t        = isType t -- won't work with hierarchy
 Pi dom cod >:> Lam t    = dom !- \ x -> (wk cod $/ x) >:> (t // x)
 Sg dom cod >:> (t :& u) = dom `goodTerm` t >>>= \ vt -> (cod $/ vt) >:> u

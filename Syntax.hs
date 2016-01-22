@@ -57,11 +57,12 @@ deriving instance Eq (En (Syn n) w)
 deriving instance Show (En (Syn n) w)
 
 -- hopefully won't need this in a ghc > 8
-instance Show (En Sem n) where
-  show (P x) = "P " ++ show x
-  show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
+--instance Show (En Sem n) where
+--  show (P x) = "P " ++ show x
+--  show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
 
 data Tm (p :: Phase)(w :: World) where
+  Let  :: En (Syn n) w -> Tm (Syn (Suc n)) w -> Tm (Syn n) w
   -- building blocks
   Atom :: String -> Tm p w
   (:&) :: Tm p w -> Tm p w -> Tm p w
@@ -71,7 +72,8 @@ data Tm (p :: Phase)(w :: World) where
 
 deriving instance Eq (Tm (Syn n) w)
 deriving instance Show (Tm (Syn n) w)
-deriving instance Show (Tm Sem w)
+--deriving instance Show (Tm Sem w)
+
 infixr 4 :&
 
 type Val = Tm Sem
@@ -85,13 +87,13 @@ type family Body (p :: Phase) ::  World -> * where
 data Scope :: World -> * where
   Scope :: Env n w -> Tm (Syn (Suc n)) w -> Scope w
 
-deriving instance Show (Scope w)
+--deriving instance Show (Scope w)
 
 data Env :: Nat -> World -> * where
   E0 :: Env Zero w
   ES :: Env n w -> Val w -> Env (Suc n) w
 
-deriving instance Show (Env n w)
+--deriving instance Show (Env n w)
 
 -- canonical things
 pattern Nil = Atom ""
@@ -115,8 +117,11 @@ instance Worldly W0 where
 instance Worldly w => Worldly (Bind w) where
   next (_ :: Proxy (Bind w)) = next (Proxy :: Proxy w) + 1
 
-data Ref w = Ref {refname :: Int , reftype :: Val w} deriving Show
+data Ref w = Ref {refname :: Int , reftype :: Val w}
 -- export only projection reftype and eq instance defined on ints only
+
+instance Show (Ref w) where
+  show = show . refname
 
 instance Eq (Ref w) where
   Ref i _ == Ref j _ = i == j
@@ -178,10 +183,11 @@ instance VarOperable En where
       -- old one
   varOp f (hd :$ tl) = varOp f hd :$ varOp f tl
 instance VarOperable Tm where
-  varOp f (En e)   = En (varOp f e)
-  varOp f (Atom s) = Atom s
-  varOp f (t :& u) = (varOp f t :& varOp f u)
-  varOp f (Lam t)  = Lam (varOp (Weak f) t)
+  varOp f (Let e t) = Let (varOp f e) (varOp (Weak f) t)
+  varOp f (En e)    = En (varOp f e)
+  varOp f (Atom s)  = Atom s
+  varOp f (t :& u)  = (varOp f t :& varOp f u)
+  varOp f (Lam t)   = Lam (varOp (Weak f) t)
 
 
 -- how to yank something that's constructed under a binder back out
@@ -273,6 +279,7 @@ instance Eval En where
   eval (f :$ s)   g = eval f g $$ eval s g
   
 instance Eval Tm where
+  eval (Let e t)       g = eval t (ES g (eval e g))
   eval (En e)          g = eval e g
   eval (Atom s)        g = Atom s
   eval (t :& u)        g = eval t g :& eval u g  
