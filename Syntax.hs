@@ -39,7 +39,7 @@ type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
 
 -- contexts of free variables
-data World = W0 | Bind World | Inner World
+data World = W0 | Bind World
 
 -- syntax indexed by contexts of bound and free variables
 
@@ -117,15 +117,11 @@ instance Worldly W0 where
 instance Worldly w => Worldly (Bind w) where
   root (_ :: Proxy (Bind w)) = fmap (+1) (root (Proxy :: Proxy w))
 
-instance Worldly w => Worldly (Inner w) where
-  root (_ :: Proxy (Inner w)) = case root (Proxy :: Proxy w) of
-    (iz,i) -> (iz :< i,0)
-
 next :: Worldly w => Proxy w -> Name
 next p = case root p of
   (iz,i) -> iz <>> [i]
 
-data RefBinder w = Decl | Hole | Defn (Val w)
+data RefBinder w = Decl | Defn (Val w)
 
 data Ref w = Ref {refBinder :: RefBinder w, refName :: Name, refType :: Val w}
 -- export only projection refType and eq instance defined on ints only
@@ -223,7 +219,6 @@ type family OR x y where
 
 type family WorldLT (w :: World)(w' :: World) :: Bool where
   WorldLT w (Bind w')  = WorldLE w w'
-  WorldLT w (Inner w') = WorldLE w w'
   WorldLT w w'         = False
 
 type family WorldLE (w :: World)(w' :: World) :: Bool where
