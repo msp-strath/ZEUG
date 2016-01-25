@@ -25,7 +25,7 @@ instance Dischargeable f g => Dischargeable (TC f) (TC g) where
 
 isType :: Worldly w => TERM w -> TC Happy w
 isType (Let e ty) = goodElim e >>>= \ (v :&: vty) ->
-  (Defn v,vty) !- \ x -> isType (ty // x)
+  (Local v,vty) !- \ x -> isType (ty // x)
 isType (En ety) =
   enType ety >>>= \ ty ->
     case ty of
@@ -45,7 +45,7 @@ goodType t = isType t >>>= \ _ -> Yes (val t)
 
 (>:>) :: Worldly w => Val w -> TERM w -> TC Happy w
 ty         >:> Let e t  = goodElim e >>>= \ (v :&: vty) ->
-  (Defn v,vty) !- \ x -> wk ty >:> (t // x)
+  (Local v,vty) !- \ x -> wk ty >:> (t // x)
 Set        >:> t        = isType t -- won't work with hierarchy
 Pi dom cod >:> Lam t    = (Decl,dom) !- \ x -> (wk cod $/ x) >:> (t // x)
 Sg dom cod >:> (t :& u) = dom `goodTerm` t >>>= \ vt -> (cod $/ vt) >:> u

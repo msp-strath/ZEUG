@@ -105,23 +105,18 @@ pattern Fst p = p :$ Atom "Fst"
 pattern Snd p = p :$ Atom "Snd"
 
 -- free variable management
-type Name = [Int]
-type Root = (Bwd Int,Int)
+type Name = Int
 
 class Worldly (w :: World) where
-  root :: Proxy w -> Root
+  next :: Proxy w -> Name
 
 instance Worldly W0 where
-  root _ = (B0,0)
+  next _ = 0
 
 instance Worldly w => Worldly (Bind w) where
-  root (_ :: Proxy (Bind w)) = fmap (+1) (root (Proxy :: Proxy w))
+  next (_ :: Proxy (Bind w)) = 1 + next (Proxy :: Proxy w)
 
-next :: Worldly w => Proxy w -> Name
-next p = case root p of
-  (iz,i) -> iz <>> [i]
-
-data RefBinder w = Decl | Defn (Val w)
+data RefBinder w = Decl | Local (Val w)
 
 data Ref w = Ref {refBinder :: RefBinder w, refName :: Name, refType :: Val w}
 -- export only projection refType and eq instance defined on ints only
@@ -281,7 +276,7 @@ class Eval t  where
 
 instance Eval En where
   eval (V x)      g = elookup x g
-  eval (P x)      g | Defn v <- refBinder x = v
+  eval (P x)      g | Local v <- refBinder x = v
                     | otherwise             = En (P x)
   eval (t ::: ty) g = eval t g
   eval (f :$ s)   g = eval f g $$ eval s g
