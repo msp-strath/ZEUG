@@ -67,3 +67,13 @@ data Happy :: k -> * where
   Happy :: Happy k
 
 data (:*) (s :: k -> *) (t :: k -> *) (i :: k) = s i :&: t i
+
+-- reflexive transitive closures
+
+data LStar r a b where
+  L0    :: LStar r a a
+  (:<:) :: LStar r a b -> r b c -> LStar r a c
+
+data RStar r a b where
+  R0    :: RStar r a a
+  (:>:) :: r a b -> RStar r b c -> RStar r a c
