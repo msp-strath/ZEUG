@@ -47,23 +47,26 @@ data World = W0 | Bind World
 
 data Phase = Syn Nat | Sem
 
-data Defn (p :: Phase)(n :: Nat)(w :: World) where
-  Defn :: Tm p w -> Defn p n w
-
 data En (p :: Phase)(w :: World) where
   V     :: Fin n -> En (Syn n) w
   P     :: Ref w -> En p w
   (:$)  :: En p w -> Tm p w -> En p w
-  (:%)  :: Defn p n w -> Env p n w -> En p w
+  (:%)  :: Global n -> Env p n w -> En p w
   (:::) :: Tm (Syn n) w -> Tm (Syn n) w -> En (Syn n) w -- type annotations
 
-deriving instance Eq (En (Syn n) w)
-deriving instance Show (En (Syn n) w)
+instance Eq (En (Syn n) w) where
+  V x == V y = x == y
+  P x == P y = x == y
+  (e :$ s) == (e' :$ s') = e == e' && s == s'
+  (x :% g) == (x' :% g') = globHetEq x x' && envHetEq g g'
+  (t ::: ty) == (t' ::: ty') = ty == ty' && t == t'
+
+--deriving instance Show (En (Syn n) w)
 
 -- hopefully won't need this in a ghc > 8
---instance Show (En Sem n) where
---  show (P x) = "P " ++ show x
---  show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
+instance Show (En (Syn m) n) where
+  show (P x) = "P " ++ show x
+  show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
 
 data Tm (p :: Phase)(w :: World) where
   Let  :: En (Syn n) w -> Tm (Syn (Suc n)) w -> Tm (Syn n) w
@@ -74,7 +77,13 @@ data Tm (p :: Phase)(w :: World) where
   -- elimination forms
   En   :: En p w -> Tm p w
 
-deriving instance Eq (Tm (Syn n) w)
+instance Eq (Tm (Syn n) w) where
+  Let e t  == Let e' t'  = e == e' && t == t'
+  Atom s   == Atom s'    = s == s'
+  (t :& s) == (t' :& s') = t == t' && s == s' 
+  Lam t    == Lam t'     = t == t'
+  En e     == En e'      = e == e'
+
 deriving instance Show (Tm (Syn n) w)
 --deriving instance Show (Tm Sem w)
 
@@ -97,6 +106,14 @@ data Scope :: World -> * where
 data Env :: Phase -> Nat -> World -> * where
   E0 :: Env p Zero w
   ES :: Env p n w -> Tm p w -> Env p (Suc n) w
+
+instance Eq (Env (Syn m) n w) where 
+  g == g' = envHetEq g g'
+
+envHetEq :: Env (Syn m) n w -> Env (Syn m) n' w -> Bool
+envHetEq E0       E0         = True
+envHetEq (ES g t) (ES g' t') = envHetEq g g' && t == t'
+envHetEq _        _          = False
 
 --deriving instance Show (Env p n w)
 
@@ -123,10 +140,13 @@ data Global (n :: Nat) = Glob
   ,  globKind :: Kind n
   ,  globDefn :: Maybe (Tm (Syn n) W0)
   }
+
 type LongName = [Int]
 instance Eq (Global n) where
-  x == y = globName x == globName y
+  x == y = globHetEq x y
 
+globHetEq ::Global n -> Global n' -> Bool
+globHetEq x y = globName x == globName y
 -- free variable management
 type Name = Int
 
