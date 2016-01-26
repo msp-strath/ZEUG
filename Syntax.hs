@@ -15,13 +15,17 @@ module Syntax(
   En(..),
   Tm(..),
   Global(globKind, globDefn),
-  KStep(..),Kind,
+  KStep(..),
   wk,
   Dischargeable(..),
   TERM,
   ELIM,
+  Phase(..),
+  Env(..),
+  Kind(..),
   (!-),
   (//),
+  eval,
   val,
   Val(..),
   Ne(..),
@@ -48,11 +52,16 @@ data World = W0 | Bind World
 data Phase = Syn Nat | Sem
 
 data En (p :: Phase)(w :: World) where
+  -- bound variable
   V     :: Fin n -> En (Syn n) w
+  -- free variable
   P     :: Ref w -> En p w
+  -- application
   (:$)  :: En p w -> Tm p w -> En p w
+  -- definition instance
   (:%)  :: Global n -> Env p n w -> En p w
-  (:::) :: Tm (Syn n) w -> Tm (Syn n) w -> En (Syn n) w -- type annotations
+  -- type annotation
+  (:::) :: Tm (Syn n) w -> Tm (Syn n) w -> En (Syn n) w
 
 instance Eq (En (Syn n) w) where
   V x == V y = x == y
@@ -131,6 +140,7 @@ pattern Snd p = p :$ Atom "Snd"
 -- framework kinds
 data KStep (m :: Nat) (n :: Nat) where
   KS :: Tm (Syn m) W0 -> KStep m (Suc m)
+
 data Kind (n :: Nat) where
   (:=>) :: LStar KStep Zero n -> Tm (Syn n) W0 -> Kind n
 
@@ -150,7 +160,7 @@ globHetEq x y = globName x == globName y
 -- free variable management
 type Name = Int
 
-class Worldly (w :: World) where
+class WorldLE W0 w ~ True => Worldly (w :: World) where
   next :: Proxy w -> Name
 
 instance Worldly W0 where

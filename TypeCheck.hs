@@ -64,9 +64,19 @@ enType (e :$ s)   = goodElim e >>>= \ (v :&: ty) -> case ty of
     Atom "Snd" -> Yes (cod $/ vfst v)
     _ -> No
   _ -> No
+enType (x :% g)   = case globKind x of
+  ks :=> cod -> goodInstance ks g >>>= \ vs -> Yes $ eval (wk cod) vs
 enType (t ::: ty) =
-  goodType ty >>>= \ vty ->
+  goodType ty >>>= \ vty -> 
   vty >:> t   >>>= \ _ -> Yes vty 
+
+goodInstance :: Worldly w => 
+            LStar KStep Zero n -> Env (Syn Zero) n w -> TC (Env Sem n) w
+goodInstance (ks :<: KS ty) (ES g t) = 
+  goodInstance ks g >>>= \ vs ->
+  eval (wk ty) vs `goodTerm` t >>>= \ v ->
+  Yes (ES vs v)
+goodInstance L0             E0       = Yes E0
 
 goodElim :: Worldly w => ELIM w -> TC (Val :* Val) w
 goodElim e = enType e >>>= \ vty -> Yes (val e :&: vty)
