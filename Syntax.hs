@@ -14,6 +14,8 @@ module Syntax(
   extend,
   En(..),
   Tm(..),
+  Global(globKind, globDefn),
+  KStep(..),Kind,
   wk,
   Dischargeable(..),
   TERM,
@@ -108,6 +110,22 @@ pattern Sg s t = Atom "Sg" :& s :& Lam t :& Nil
 -- elimination forms
 pattern Fst p = p :$ Atom "Fst"
 pattern Snd p = p :$ Atom "Snd"
+
+-- framework kinds
+data KStep (m :: Nat) (n :: Nat) where
+  KS :: Tm (Syn m) W0 -> KStep m (Suc m)
+data Kind (n :: Nat) where
+  (:=>) :: LStar KStep Zero n -> Tm (Syn n) W0 -> Kind n
+
+-- global definitions
+data Global (n :: Nat) = Glob
+  {  globName :: LongName
+  ,  globKind :: Kind n
+  ,  globDefn :: Maybe (Tm (Syn n) W0)
+  }
+type LongName = [Int]
+instance Eq (Global n) where
+  x == y = globName x == globName y
 
 -- free variable management
 type Name = Int

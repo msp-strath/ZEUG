@@ -77,3 +77,12 @@ data LStar r a b where
 data RStar r a b where
   R0    :: RStar r a a
   (:>:) :: r a b -> RStar r b c -> RStar r a c
+
+
+-- existential
+
+data Ex (f :: k -> *) where
+  Wit :: f i -> Ex f
+
+type Dot f g = Ex (f :* g)
+
