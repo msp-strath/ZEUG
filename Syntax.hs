@@ -45,10 +45,14 @@ data World = W0 | Bind World
 
 data Phase = Syn Nat | Sem
 
+data Defn (p :: Phase)(n :: Nat)(w :: World) where
+  Defn :: Tm p w -> Defn p n w
+
 data En (p :: Phase)(w :: World) where
   V     :: Fin n -> En (Syn n) w
   P     :: Ref w -> En p w
   (:$)  :: En p w -> Tm p w -> En p w
+  (:%)  :: Defn p n w -> Env p n w -> En p w
   (:::) :: Tm (Syn n) w -> Tm (Syn n) w -> En (Syn n) w -- type annotations
 
 deriving instance Eq (En (Syn n) w)
@@ -83,15 +87,16 @@ type family Body (p :: Phase) ::  World -> * where
 
 -- a closed closure
 data Scope :: World -> * where
-  Scope :: Env n w -> Tm (Syn (Suc n)) w -> Scope w
+  Scope :: Env Sem n w -> Tm (Syn (Suc n)) w -> Scope w
 
 --deriving instance Show (Scope w)
 
-data Env :: Nat -> World -> * where
-  E0 :: Env Zero w
-  ES :: Env n w -> Val w -> Env (Suc n) w
+-- world indexed vectors would also do...
+data Env :: Phase -> Nat -> World -> * where
+  E0 :: Env p Zero w
+  ES :: Env p n w -> Tm p w -> Env p (Suc n) w
 
---deriving instance Show (Env n w)
+--deriving instance Show (Env p n w)
 
 -- canonical things
 pattern Nil = Atom ""
@@ -267,12 +272,12 @@ vfst, vsnd :: Val w -> Val w
 vfst p = p $$ Atom "Fst"
 vsnd p = p $$ Atom "Snd"
 
-elookup :: Fin n -> Env n w -> Val w
+elookup :: Fin n -> Env p n w -> Tm p w
 elookup FZero    (ES g v) = v
 elookup (FSuc i) (ES g v) = elookup i g
 
 class Eval t  where
-  eval :: t (Syn n) w -> Env n w -> Val w
+  eval :: t (Syn n) w -> Env Sem n w -> Val w
 
 instance Eval En where
   eval (V x)      g = elookup x g
