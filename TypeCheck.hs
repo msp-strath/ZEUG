@@ -15,6 +15,8 @@ data TC t w where
   No  :: TC t w
   deriving Show
 
+instance Weakenable t => Weakenable (TC t)
+
 (>>>=) :: TC s w -> (s w -> TC t w) -> TC t w
 Yes s >>>= f = f s
 No    >>>= _ = No

@@ -14,7 +14,7 @@ data Tm (n :: Nat) :: * where
   Lam :: Tm (Suc n)         -> Tm n
   App :: Tm n       -> Tm n -> Tm n
   V   :: Fin n              -> Tm n
-  P   :: String             -> 
+  P   :: String             -> Tm n
 
 deriving instance Show (Tm n)
 

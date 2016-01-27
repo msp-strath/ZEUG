@@ -10,6 +10,7 @@ module Syntax(
   RefBinder(..),
   Ref(refType), -- not exporting refName
   Extended(),
+  extwk,
   extrRef,
   extend,
   En(..),
@@ -34,7 +35,8 @@ module Syntax(
   vfst,
   vsnd,
   ($/),
-  etaquote
+  etaquote,
+  Weakenable
   ) where
 import Utils
 import Unsafe.Coerce
@@ -184,6 +186,9 @@ data Extended :: World -> World -> * where
   EBind :: Ref (Bind u) -> Extended u (Bind u)
   -- one-step extension of u = G ; x : S |- G
 
+extwk :: Weakenable t => Extended u v -> t u -> t v
+extwk (EBind r) = wk
+
 -- we don't make fresh variables we make fresh context extensions
 extend :: forall w . Worldly w => (RefBinder w, Val w) -> Extended w (Bind w)
 extend (rb, ty) = EBind (Ref (wk rb) (next (Proxy :: Proxy w)) (wk ty))
@@ -306,6 +311,8 @@ instance Weakenable (Tm p)
 instance Weakenable (En p)
 
 instance Weakenable (RefBinder)
+
+instance Weakenable Ref
 
 ($/) :: Scope w -> Val w -> Val w
 Scope g t $/ v = eval t (ES g v)
