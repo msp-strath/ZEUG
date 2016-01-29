@@ -83,5 +83,9 @@ data RStar r a b where
 data Ex (f :: k -> *) where
   Wit :: f i -> Ex f
 
+data Ex2 (f :: k -> l -> *)(j :: l) where
+  Wit2 :: f i j  -> Ex2 f j
+
+
 type Dot f g = Ex (f :* g)
 

@@ -2,7 +2,7 @@
              MultiParamTypeClasses, FunctionalDependencies,
              TypeFamilies, PolyKinds, UndecidableInstances,
              FlexibleInstances, ScopedTypeVariables, StandaloneDeriving,
-             PatternSynonyms #-}
+             PatternSynonyms, TypeOperators, ConstraintKinds #-}
 module Syntax(
   World(..),
   Worldly,
@@ -36,7 +36,8 @@ module Syntax(
   vsnd,
   ($/),
   etaquote,
-  Weakenable
+  Weakenable,
+  type (<=)
   ) where
 import Utils
 import Unsafe.Coerce
@@ -276,6 +277,8 @@ type family WorldLT (w :: World)(w' :: World) :: Bool where
 
 type family WorldLE (w :: World)(w' :: World) :: Bool where
   WorldLE w w' = OR (EQ w w') (WorldLT w w')
+
+type u <= v = WorldLE u v ~ True
 
 class RefEmbeddable t where
   emb :: Ref w -> t w
