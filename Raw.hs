@@ -4,6 +4,22 @@ import Control.Applicative
 
 import Layout
 
+data RawModule
+  = RawTip     (Sub RawTip)
+  | RawParam   (String, Sub RawTm)     (Sub RawModule)
+  | RawSubMod  (String, Sub RawModule) (Sub RawModule)
+  | RawModComm [Sub (Maybe RawSplice)] (Sub RawModule)
+  deriving Show
+
+data RawTip
+  = RawBlank
+  | RawDefn (Either (Sub RawHole) (Sub RawTm)) (Sub RawTm)
+  deriving Show
+           
+data RawHole
+  = RawQuestionMark
+  deriving Show
+           
 data RawTm
   = RawAtom String
   | RawList [Sub RawTm] (Maybe (Sub RawTm))
@@ -26,9 +42,31 @@ tag = sym >>= \ x -> case x of
 
 var :: ParseTokens String
 var = sym >>= \ x -> case x of
-  c : s | elem c "'\\" -> empty
+  c : s | elem c "'\\-" -> empty
   _ | elem ':' x -> empty
   _ -> return x
+
+bigMod :: ParseTokens RawModule
+bigMod = id <$ gap <*> (RawTip <$> sub smallTip
+   <|> RawParam <$> (grp "(" ((,) <$ gap <*> var <* gap <*
+                              eat ":" <* gap <*> sub bigTm <* gap )  ")")
+                <*> sub bigMod
+   <|> RawSubMod <$> (grp "{" ((,) <$ gap <*> var <* gap
+                              <*> sub bigMod <* gap )  "}")
+                <*> sub bigMod
+   <|> RawModComm <$> (grp "{" (id <$ eat "-" <*> nonsense <* eat "-")  "}")
+                <*> sub bigMod)
+
+holeOrDef :: ParseTokens (Either (Sub RawHole) (Sub RawTm))
+holeOrDef = Left <$> sub hole <|> Right <$> sub bigTm
+
+hole :: ParseTokens RawHole
+hole = RawQuestionMark <$ eat "?"
+
+smallTip :: ParseTokens RawTip
+smallTip = id <$ gap <*> (pure RawBlank
+   <|> RawDefn <$ eat "=" <* gap <*> holeOrDef <* gap <*
+     eat ":" <* gap <*> sub bigTm <* gap)
 
 smallTm :: ParseTokens RawTm   -- definitely small
 smallTm
@@ -103,3 +141,9 @@ rawTreeFormat = Format (:&) (gap *> bigTm <* gap) rawTreeFormat
 
 rawTest :: String -> [[RawTree]]
 rawTest = document rawTreeFormat . layout
+
+-- parses nonsense (headline (layout "blah ( bler        )       berr"))
+-- parses bigMod (headline (layout ""))
+-- parses bigMod (headline (layout "(x : S)"))
+-- parses bigMod (headline (layout "(x : S){x}"))
+-- parses bigMod (headline (layout "(x : S){x = hello : world}"))
