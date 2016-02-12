@@ -37,7 +37,8 @@ module Syntax(
   ($/),
   etaquote,
   Weakenable,
-  type (<=)
+  type (<=),
+  VarOperable(..)
   ) where
 import Utils
 import Unsafe.Coerce

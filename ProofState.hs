@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, PolyKinds, GADTs, DataKinds, TypeOperators #-}
+{-# LANGUAGE KindSignatures, PolyKinds, GADTs, DataKinds, TypeOperators, ScopedTypeVariables #-}
 
 module ProofState where
 
@@ -39,16 +39,15 @@ data PTip (w :: World) where
   
 data Resolution (w :: World) where
   RParam :: Ref w -> Resolution w
-  RGlob  :: Global n -> Env (Syn Zero) m w -> Resolution w
+  RGlob  :: Global n -> Bwd (TERM w) -> Resolution w
 
 instance Weakenable Resolution
 
-stripParams :: PZ True v w -> Ex2 (Env (Syn Zero)) w
+stripParams :: PZ True v w -> Bwd (TERM w)
 stripParams = stripParams' id where
-  stripParams' :: (TERM u -> TERM w) -> PZ True v u -> Ex2 (Env (Syn Zero)) w
-  stripParams' w L0                    = Wit2 E0
-  stripParams' w (pz :<: Param y e)    = case stripParams' (w . extwk e) pz of
-      Wit2 g -> Wit2 (ES g (w (En (P (extrRef e)))))
+  stripParams' :: (TERM u -> TERM w) -> PZ True v u -> Bwd (TERM w)
+  stripParams' w L0                    = B0
+  stripParams' w (pz :<: Param y e)    = stripParams' (w . extwk e) pz :< w (En (P (extrRef e)))
   stripParams' w (pz :<: Module _ _ _) = stripParams' w pz
   stripParams' w (pz :<: Middle _ _)   = stripParams' w pz
 
@@ -72,7 +71,28 @@ bake ps ns (RawEn (_ := hd) tl)                      =
 bake ps ns (RawComm (_ := t) _)                      = bake ps ns t -- should deal with the comments...
 
 boil :: PZ True v w -> Vec Naming n -> RawHd -> [Tm (Syn n) w] -> TC (Tm (Syn n)) w
-boil = undefined
+boil ps ns (RawTy (_ := t) (_ := ty)) ts = bake ps ns t >>>= \ t -> bake ps ns ty >>>= \ ty ->
+  Yes (En (foldl (:$) (t ::: ty) ts))
+boil ps ns (RawVar (x,xs)) ts = case blah x ns of
+  Left x  -> resolve (x,xs) ps >>>= \ res -> case res of
+      RParam x   -> Yes (En (foldl (:$) (P x) ts))
+      RGlob f tz -> case globKind f of
+        (sz :=> _) -> case help sz (fmap vclosed tz <>> ts) of
+          Nothing -> No
+          Just (g,ts) -> Yes (En (foldl (:$) (f :% g) ts))
+          where
+          help :: LStar KStep Zero m -> [Tm (Syn n) w] -> Maybe (Env (Syn n) m w, [Tm (Syn n) w])
+          help L0 ts = return (E0, ts)
+          help (sz :<: KS _) ts = do
+            (g,t:ts) <- help sz ts
+            return (ES g t,ts)
+  Right i -> if null xs then Yes (En (foldl (:$) (V i) ts)) else No
+
+blah :: NameStep -> Vec Naming n -> Either NameStep (Fin n)
+blah x VNil = Left x
+blah x (VCons y ys) = case eqNameStep y x of
+  Left x   -> fmap FSuc $ blah x ys
+  Right () -> Right FZero
 
 resolve :: RawLongName -> PZ True v w -> TC Resolution w
 resolve (xi,nsteps) = lookOut xi
@@ -90,9 +110,9 @@ resolve (xi,nsteps) = lookOut xi
   lookOut xi (pz :<: Module y mglob (pz' :!-: _)) =
     case eqNameStep y xi of
       -- found the 'corner'; look inside
-      Right _ -> case (lookInside nsteps mglob pz', stripParams pz) of 
-        (Just (Wit glob), Wit2 g) -> Yes (RGlob glob g)
-        _                         -> No
+      Right _ -> case lookInside nsteps mglob pz' of 
+        (Just (Wit glob)) -> Yes (RGlob glob (stripParams pz))
+        _                 -> No
       -- carry on looking
       Left xi -> lookOut xi pz
   lookOut i (pz :<: Middle _ _  )                     = lookOut i pz
