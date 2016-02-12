@@ -9,43 +9,60 @@ import Raw
 import Syntax
 import TypeCheck
 
+type Supply = (Bwd Int, Int)
+
+supply0 :: Supply
+supply0 = (B0, 0)
+supplySuc :: Supply -> Supply
+supplySuc (is, i) = (is,i+1)
+supplySic :: Supply -> Supply
+supplySic (is, i) = (is :< i,0)
+supply :: Supply -> LongName
+supply (is, i) = is <>> [i]
+
+
 data ProofState (b :: Bool)(u :: World) where
-  (:!-:) :: Worldly w => PZ b u w -> PTip w -> ProofState b u
+  (:!-:) :: Worldly w => (PZ b u w, Supply) -> PTip w -> ProofState b u
 
 type PROOFSTATE = ProofState True W0
 
 ambulando :: PROOFSTATE -> PROOFSTATE
-
-ambulando (ps :!-: PRaw (_ := RawTip (_ := RawBlank)))              = ambulando (ps :!-: P0)
-ambulando (ps :!-: (PRaw (_ := RawTip (_ := RawDefn t (_ := ty))) :: PTip w)) = case help of
-    No         -> ambulando (ps :!-: P0)
-    Yes (TC t :&: ty) -> ambulando (ps :!-: PDef t ty)
+ambulando ((ps,sup) :!-: PRaw (_ := RawTip (_ := RawBlank)))              = ambulando ((ps,sup) :!-: P0)
+ambulando ((ps,sup) :!-: (PRaw (_ := RawTip (_ := RawDefn t (_ := ty))) :: PTip w)) = case help of
+    No         -> ambulando ((ps,sup) :!-: P0)
+    Yes (TC t :&: ty) -> ambulando ((ps,sup) :!-: PDef t ty)
   where
   help :: TC (TC TERM :* TERM) w
   help = bake ps VNil ty >>>= \ ty -> goodType ty >>>= \ vty -> case t of
     Left _ -> Yes (No :&: ty)
     Right (_ := t) -> Yes ((bake ps VNil t >>>= \ t -> vty >:> t >>>= \ _ -> Yes t) :&: ty) 
     
-ambulando (ps :!-: PRaw (_ := RawParam (x,_ := s) m)) = case bake ps VNil s >>>= goodType of
-  Yes s -> ambulando (ps :<: Param x (extend (Decl,s)) :!-: PRaw m)
-  No    -> ambulando (ps :!-: P0) 
-ambulando (ps :!-: PRaw (_ := RawSubMod (x,m) m')) =
-  ambulando (ps :<: Middle x (L0 :!-: PRaw m') :!-: PRaw m)
-ambulando (ps :!-: PRaw (_ := RawModComm mrs m))   = ambulando (ps :!-: PRaw m) -- bad: binning the comment
-ambulando (ps :!-: tipi) = case help ps of
-    Wit (L0 :&: _) -> ps :!-: tipi
-    Wit ((pso :<: Middle x (psu :!-: tipu)) :&: Flip psi) -> ((pso :<: Module x Nothing (psi :!-: tipi)) >>> lmap annoying psu :!-: tipu)
+ambulando ((ps,sup) :!-: PRaw (_ := RawParam (x,_ := rs) m)) = case bake ps VNil rs >>>= \ bs -> goodType bs >>>= \ vs -> Yes (bs :&: vs) of
+  Yes (bs :&: vs) -> ambulando ((ps :<: Param x (extend (Decl,vs)) bs,sup) :!-: PRaw m)
+  No    -> ambulando ((ps,sup) :!-: P0) 
+ambulando ((ps,sup) :!-: PRaw (_ := RawSubMod (x,m) m')) =
+  ambulando ((ps :<: Middle x (supply sup) ((L0,supplySuc sup) :!-: PRaw m'), supplySic sup) :!-: PRaw m)
+ambulando ((ps,sup) :!-: PRaw (_ := RawModComm mrs m))   = ambulando ((ps,sup) :!-: PRaw m) -- bad: binning the comment
+ambulando prfst@((ps,supi) :!-: tipi) = case help ps of
+    Wit (L0 :&: _) -> prfst
+    Wit ((pso :<: Middle x ln ((psu,supu) :!-: tipu)) :&: Flip psi) -> case lifter ps of
+      Lifting del rho -> (((pso :<: Module x (globber ln prfst) ((psi,supi) :!-: tipi)) >>> lmap annoying psu,supu) :!-: tipu)
       -- should cache a thing rather just sticking in a Nothing
-    where 
-    annoying :: PZStep False u w -> PZStep True u w
-    annoying (Param n e) = Param n e
-    annoying (Module n g p) = Module n g p
+    where
+    globber :: LongName -> PROOFSTATE -> Maybe (Ex Global)
+    globber ln ((ps,_) :!-: PDef mt ty) = case lifter ps of
+      Lifting del rho -> Just (Wit (Glob ln (del :=> varOp rho ty) (fmap (varOp rho) mt)))
+    globber ln _ = Nothing
     
+    annoying :: PZStep False u w -> PZStep True u w
+    annoying (Param n e ty) = Param n e ty
+    annoying (Module n g p) = Module n g p
+
     help :: PZ True u w -> RC (PZ True) (PZ False) u w
     help L0                        = Wit (L0 :&: Flip L0)
-    help ps@(_ :<: Middle _ _)     = Wit (ps :&: Flip L0)
-    help (ps :<: Param n e)        = case help ps of
-      Wit (ps :&: Flip ps') -> Wit (ps :&: Flip (ps' :<: Param n e))
+    help ps@(_ :<: Middle _ _ _)     = Wit (ps :&: Flip L0)
+    help (ps :<: Param n e ty)        = case help ps of
+      Wit (ps :&: Flip ps') -> Wit (ps :&: Flip (ps' :<: Param n e ty))
     help (ps :<: Module n mg x) = case help ps of
       Wit (ps :&: Flip ps') -> Wit (ps :&: Flip (ps' :<: Module n mg x))
 
@@ -53,11 +70,11 @@ ambulando (ps :!-: tipi) = case help ps of
 type PZ b = LStar (PZStep b)
 
 data PZStep (b :: Bool)(v :: World) (w :: World) where
-  Param   :: Naming -> Extended v w -> PZStep b v w
+  Param   :: Naming -> Extended v w -> TERM v -> PZStep b v w
   Module  :: Naming -> Maybe (Ex Global) -> ProofState False w ->
              PZStep b w w
   -- middle is a back pointer
-  Middle  :: Naming -> ProofState False w -> PZStep True w w
+  Middle  :: Naming -> LongName -> ProofState False w -> PZStep True w w
 
 data PTip (w :: World) where
   P0   :: PTip w
@@ -74,9 +91,19 @@ stripParams :: PZ True v w -> Bwd (TERM w)
 stripParams = stripParams' id where
   stripParams' :: (TERM u -> TERM w) -> PZ True v u -> Bwd (TERM w)
   stripParams' w L0                    = B0
-  stripParams' w (pz :<: Param y e)    = stripParams' (w . extwk e) pz :< w (En (P (extrRef e)))
+  stripParams' w (pz :<: Param y e _)  = stripParams' (w . extwk e) pz :< w (En (P (extrRef e)))
   stripParams' w (pz :<: Module _ _ _) = stripParams' w pz
-  stripParams' w (pz :<: Middle _ _)   = stripParams' w pz
+  stripParams' w (pz :<: Middle _ _ _) = stripParams' w pz
+
+data Lifting (w :: World) where
+  Lifting :: LStar KStep Zero n -> VarOp Zero n w W0 -> Lifting w
+
+lifter :: PZ True W0 w -> Lifting w
+lifter L0 = Lifting L0 IdVO
+lifter (ps :<: Param x e ty) = case lifter ps of
+  Lifting del rho -> Lifting (del :<: KS (varOp rho ty)) (Abst rho e)
+lifter (ps :<: Module _ _ _) = lifter ps
+lifter (ps :<: Middle _ _ _) = lifter ps
 
 eqNameStep :: Naming -> NameStep -> Either NameStep ()
 eqNameStep y xi@(x,i) = case (x == y, i) of
@@ -126,7 +153,7 @@ resolve (xi,nsteps) = lookOut xi
   where 
   lookOut :: NameStep -> PZ True v w -> TC Resolution w
   lookOut xi L0                                        = No
-  lookOut xi (pz :<: Param  y e)                       =
+  lookOut xi (pz :<: Param  y e _)                       =
     case eqNameStep y xi of
        -- found it!
       Right _ | null nsteps -> Yes $ RParam (extrRef e)
@@ -134,7 +161,7 @@ resolve (xi,nsteps) = lookOut xi
               | otherwise   -> No
        -- carry on looking
       Left xi -> extwk e $ lookOut xi pz
-  lookOut xi (pz :<: Module y mglob (pz' :!-: _)) =
+  lookOut xi (pz :<: Module y mglob ((pz',_) :!-: _)) =
     case eqNameStep y xi of
       -- found the 'corner'; look inside
       Right _ -> case lookInside nsteps mglob pz' of 
@@ -142,7 +169,7 @@ resolve (xi,nsteps) = lookOut xi
         _                 -> No
       -- carry on looking
       Left xi -> lookOut xi pz
-  lookOut i (pz :<: Middle _ _  )                     = lookOut i pz
+  lookOut i (pz :<: Middle _ _ _)                = lookOut i pz
 
   lookInside :: [NameStep] -> Maybe (Ex Global) -> PZ False v w ->
                 Maybe (Ex Global)
@@ -151,9 +178,9 @@ resolve (xi,nsteps) = lookOut xi
     where
     lookInside' :: NameStep -> PZ False v w -> Maybe (Ex Global)
     lookInside' _ L0 = Nothing
-    lookInside' xi (pz :<: Param _ _) = lookInside' xi pz
+    lookInside' xi (pz :<: Param _ _ _) = lookInside' xi pz
       -- parameters are not in scope
-    lookInside' xi (pz :<: Module y mglob (pz' :!-: _)) =
+    lookInside' xi (pz :<: Module y mglob ((pz',_) :!-: _)) =
       case eqNameStep y xi of
         -- found the next step
         Right _ -> lookInside xs mglob pz'

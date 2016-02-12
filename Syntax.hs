@@ -15,7 +15,7 @@ module Syntax(
   extend,
   En(..),
   Tm(..),
-  Global(globKind, globDefn),
+  Global(..),
   KStep(..),
   wk,
   Dischargeable(..),
@@ -38,7 +38,10 @@ module Syntax(
   etaquote,
   Weakenable,
   type (<=),
-  VarOperable(..)
+  VarOperable(..),
+  VarOp(..),
+  LongName,
+
   ) where
 import Utils
 import Unsafe.Coerce
