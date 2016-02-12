@@ -24,6 +24,23 @@ supply (is, i) = is <>> [i]
 data ProofState (b :: Bool)(u :: World) where
   (:!-:) :: Worldly w => (PZ b u w, Supply) -> PTip w -> ProofState b u
 
+ugly :: Int -> ProofState b u -> String
+ugly i ((ps,_) :!-: tip) = uglies ps ++ "\n" ++ replicate i ' ' ++  uglytip tip
+  where
+  uglies :: PZ b u w -> String
+  uglies L0 = ""
+  uglies (ps :<: step) = uglies ps ++ "\n" ++ replicate i ' ' ++ uglyStep step
+
+  uglyStep :: PZStep b v w -> String
+  uglyStep (Param n e ty)   = concat ["(",n," : ",show ty,")"]
+  uglyStep (Module n mg ps) = concat ["{",n,"\n",ugly (i+2) ps,"}"]
+  uglyStep (Middle n ln ps) = concat ["after ",n,"\n",ugly i ps]
+
+  uglytip :: PTip w -> String
+  uglytip P0           = ""
+  uglytip (PDef mt ty) = maybe "?" show mt ++ " : " ++ show ty
+  uglytip (PRaw rm)    = "Raw..."
+
 type PROOFSTATE = ProofState True W0
 
 ambulando :: PROOFSTATE -> PROOFSTATE
@@ -46,7 +63,7 @@ ambulando ((ps,sup) :!-: PRaw (_ := RawModComm mrs m))   = ambulando ((ps,sup) :
 ambulando prfst@((ps,supi) :!-: tipi) = case help ps of
     Wit (L0 :&: _) -> prfst
     Wit ((pso :<: Middle x ln ((psu,supu) :!-: tipu)) :&: Flip psi) -> case lifter ps of
-      Lifting del rho -> (((pso :<: Module x (globber ln prfst) ((psi,supi) :!-: tipi)) >>> lmap annoying psu,supu) :!-: tipu)
+      Lifting del rho -> ambulando (((pso :<: Module x (globber ln prfst) ((psi,supi) :!-: tipi)) >>> lmap annoying psu,supu) :!-: tipu)
       -- should cache a thing rather just sticking in a Nothing
     where
     globber :: LongName -> PROOFSTATE -> Maybe (Ex Global)
@@ -187,4 +204,5 @@ resolve (xi,nsteps) = lookOut xi
         -- carry on looking
         Left xi -> lookInside' xi pz
 
-    
+testRig :: String -> String
+testRig s = ugly 0 (ambulando ((L0,supply0) :!-: PRaw (snd (head (parses (sub bigMod) (headline (layout s)))))))
