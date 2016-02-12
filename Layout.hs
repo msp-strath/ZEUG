@@ -212,6 +212,10 @@ newtype ParseTokens a = ParseTokens
 
 data Sub x = [Token] := x deriving Show
 
+subproj :: Sub x -> x
+subproj (_ := x) = x
+
+
 sub :: ParseTokens a -> ParseTokens (Sub a)
 sub ap = ParseTokens $ \ ts -> do
   (ad, a, ts) <- parseTokens ap ts    -- parse the substructure
@@ -289,6 +293,10 @@ grow i ap kp = ParseTokens $ \ ts -> extend i (parseTokens ap ts) where
     | (bd, ab, ts) <- parseTokens (kp (ats := a)) ts
     ] where ats = ad []
 
+refine :: (a -> Maybe b) -> ParseTokens a -> ParseTokens b
+refine f p = p >>= \a -> case f a of
+  Nothing -> empty
+  Just b  -> return b
 
 ------------------------------------------------------------------------------
 -- PARSING DOCUMENTS

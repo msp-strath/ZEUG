@@ -3,23 +3,27 @@
              UndecidableInstances, MultiParamTypeClasses,
              FunctionalDependencies, TypeOperators,
              FlexibleInstances, GADTs, DeriveFunctor, RankNTypes,
-             EmptyCase, TypeFamilies #-}
+             EmptyCase, TypeFamilies, PatternSynonyms, GeneralizedNewtypeDeriving #-}
 module TypeCheck where
 
 import Utils
 import Syntax
 
 -- our monad is on world-indexed sets
-data TC t w where
-  Yes :: t w -> TC t w
-  No  :: TC t w
-  deriving Show
+newtype TC t w = TC (Maybe (t w))
+
+pattern Yes t = TC (Just t)
+pattern No    = TC Nothing
 
 instance Weakenable t => Weakenable (TC t)
 
 (>>>=) :: TC s w -> (s w -> TC t w) -> TC t w
 Yes s >>>= f = f s
 No    >>>= _ = No
+
+(>>>==) :: [TC s w] -> ([s w] -> TC t w) -> TC t w
+[]     >>>== k = k []
+(x:xs) >>>== k = x >>>= \ x -> xs >>>== \ xs -> k (x:xs)
 
 instance Dischargeable f g => Dischargeable (TC f) (TC g) where
   discharge x No      = No

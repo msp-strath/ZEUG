@@ -1,8 +1,28 @@
 module Raw where
 
 import Control.Applicative
+import Data.List.Split
 
 import Layout
+
+type Naming = String
+
+type NameStep = (Naming, Int)
+type RawLongName = (NameStep, [NameStep])
+
+getRawLongName :: String -> Maybe RawLongName
+getRawLongName s =
+  do
+    x:xs <- traverse splitHat (splitOn "." s)
+    return (x,xs)
+  where
+  splitHat :: String -> Maybe NameStep
+  splitHat s = case splitOn "^" s of
+    [s]   -> Just (s,0)
+    [s,i] -> case reads i of
+      [(i,"")] -> Just (s,i)
+      _        -> Nothing
+    _     -> Nothing
 
 data RawModule
   = RawTip     (Sub RawTip)
@@ -31,7 +51,7 @@ data RawTm
 type RawSplice = RawTm
 
 data RawHd
-  = RawVar String
+  = RawVar  RawLongName
   | RawTy (Sub RawTm) (Sub RawTm)
   deriving Show
 
@@ -129,15 +149,15 @@ bigTm = stuff <|> RawComm <$> sub stuff <* gap <* eat "--" <*> nonsense
 
 smallHd :: ParseTokens RawHd  -- definitely small
 smallHd
-  =    RawVar <$> var
+  =    RawVar <$> refine getRawLongName var
   <|>  grp "(" (RawTy <$ gap <*> sub bigTm <* gap <* 
                 eat ":"
                 <* gap <*> sub bigTm <* gap) ")"
 
-data RawTree = ([Token], RawTm) :& [RawTree] deriving Show
+data RawTree = ([Token], RawTm) :&&: [RawTree] deriving Show
 
 rawTreeFormat :: Format RawTree
-rawTreeFormat = Format (:&) (gap *> bigTm <* gap) rawTreeFormat
+rawTreeFormat = Format (:&&:) (gap *> bigTm <* gap) rawTreeFormat
 
 rawTest :: String -> [[RawTree]]
 rawTest = document rawTreeFormat . layout
