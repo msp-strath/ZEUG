@@ -1,6 +1,6 @@
 {-# LANGUAGE KindSignatures, DataKinds, EmptyCase, GADTs,
              DeriveFunctor, StandaloneDeriving, PolyKinds,
-             TypeOperators #-}
+             TypeOperators, ScopedTypeVariables, RankNTypes #-}
 module Utils where
 
 data Nat = Zero | Suc Nat deriving Show
@@ -74,9 +74,36 @@ data LStar r a b where
   L0    :: LStar r a a
   (:<:) :: LStar r a b -> r b c -> LStar r a c
 
+lextend :: (forall a b . r a b -> LStar s a b) -> LStar r a b  -> LStar s a b
+lextend f L0 = L0
+lextend f (xs :<: x) = lextend f xs >>> f x
+
+lmap :: (forall a b . r a b -> s a b) -> LStar r a b  -> LStar s a b
+lmap f xs = lextend (\ x -> L0 :<: f x) xs
 data RStar r a b where
   R0    :: RStar r a a
   (:>:) :: r a b -> RStar r b c -> RStar r a c
+
+class Category (hom :: obj -> obj -> *) where
+  idCat :: hom x x
+  (<<<) :: hom y z -> hom x y -> hom x z
+  f <<< g = g >>> f
+  (>>>) :: hom x y -> hom y z -> hom x z
+  f >>> g = g <<< f
+
+instance Category (->) where
+  idCat = id
+  (<<<) = (.)
+
+instance Category (LStar r) where
+  idCat = L0
+  xs >>> L0 = xs
+  xs >>> (ys :<: y) = (xs >>> ys) :<: y
+
+instance Category (RStar r) where
+  idCat = R0
+  R0 >>> ys = ys
+  (x :>: xs) >>> ys = x :>: (xs >>> ys)
 
 -- existential
 
@@ -86,6 +113,8 @@ data Ex (f :: k -> *) where
 data Ex2 (f :: k -> l -> *)(j :: l) where
   Wit2 :: f i j  -> Ex2 f j
 
-
 type Dot f g = Ex (f :* g)
 
+newtype Flip {- ping 'eck -} f x y = Flip {pilf :: f y x}
+
+type RC r s x y = Dot (r x) (Flip s y)

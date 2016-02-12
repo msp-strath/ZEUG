@@ -15,6 +15,7 @@ data ProofState (b :: Bool)(u :: World) where
 type PROOFSTATE = ProofState True W0
 
 ambulando :: PROOFSTATE -> PROOFSTATE
+
 ambulando (ps :!-: PRaw (_ := RawTip (_ := RawBlank)))              = ambulando (ps :!-: P0)
 ambulando (ps :!-: (PRaw (_ := RawTip (_ := RawDefn t (_ := ty))) :: PTip w)) = case help of
     No         -> ambulando (ps :!-: P0)
@@ -31,7 +32,22 @@ ambulando (ps :!-: PRaw (_ := RawParam (x,_ := s) m)) = case bake ps VNil s >>>=
 ambulando (ps :!-: PRaw (_ := RawSubMod (x,m) m')) =
   ambulando (ps :<: Middle x (L0 :!-: PRaw m') :!-: PRaw m)
 ambulando (ps :!-: PRaw (_ := RawModComm mrs m))   = ambulando (ps :!-: PRaw m) -- bad: binning the comment
-ambulando (ps :!-: tip) = (ps :!-: tip)
+ambulando (ps :!-: tipi) = case help ps of
+    Wit (L0 :&: _) -> ps :!-: tipi
+    Wit ((pso :<: Middle x (psu :!-: tipu)) :&: Flip psi) -> ((pso :<: Module x Nothing (psi :!-: tipi)) >>> lmap annoying psu :!-: tipu)
+      -- should cache a thing rather just sticking in a Nothing
+    where 
+    annoying :: PZStep False u w -> PZStep True u w
+    annoying (Param n e) = Param n e
+    annoying (Module n g p) = Module n g p
+    
+    help :: PZ True u w -> RC (PZ True) (PZ False) u w
+    help L0                        = Wit (L0 :&: Flip L0)
+    help ps@(_ :<: Middle _ _)     = Wit (ps :&: Flip L0)
+    help (ps :<: Param n e)        = case help ps of
+      Wit (ps :&: Flip ps') -> Wit (ps :&: Flip (ps' :<: Param n e))
+    help (ps :<: Module n mg x) = case help ps of
+      Wit (ps :&: Flip ps') -> Wit (ps :&: Flip (ps' :<: Module n mg x))
 
 -- b : Bool signifies if Middle is allowed
 type PZ b = LStar (PZStep b)
