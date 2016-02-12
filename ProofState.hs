@@ -10,16 +10,27 @@ import Syntax
 import TypeCheck
 
 data ProofState (b :: Bool)(u :: World) where
-  (:!-:) :: PZ b u w -> PTip w -> ProofState b u
+  (:!-:) :: Worldly w => PZ b u w -> PTip w -> ProofState b u
 
 type PROOFSTATE = ProofState True W0
 
 ambulando :: PROOFSTATE -> PROOFSTATE
-ambulando (ps :!-: PRaw (_ := RawTip tip))         = undefined
-ambulando (ps :!-: PRaw (_ := RawParam (s,t) m))   = undefined
-ambulando (ps :!-: PRaw (_ := RawSubMod (s,m) m')) =
-  ambulando (ps :<: Middle s (L0 :!-: PRaw m') :!-: PRaw m)
-ambulando (ps :!-: PRaw (_ := RawModComm mrs m))   = undefined
+ambulando (ps :!-: PRaw (_ := RawTip (_ := RawBlank)))              = ambulando (ps :!-: P0)
+ambulando (ps :!-: (PRaw (_ := RawTip (_ := RawDefn t (_ := ty))) :: PTip w)) = case help of
+    No         -> ambulando (ps :!-: P0)
+    Yes (TC t :&: ty) -> ambulando (ps :!-: PDef t ty)
+  where
+  help :: TC (TC TERM :* TERM) w
+  help = bake ps VNil ty >>>= \ ty -> goodType ty >>>= \ vty -> case t of
+    Left _ -> Yes (No :&: ty)
+    Right (_ := t) -> Yes ((bake ps VNil t >>>= \ t -> vty >:> t >>>= \ _ -> Yes t) :&: ty) 
+    
+ambulando (ps :!-: PRaw (_ := RawParam (x,_ := s) m)) = case bake ps VNil s >>>= goodType of
+  Yes s -> ambulando (ps :<: Param x (extend (Decl,s)) :!-: PRaw m)
+  No    -> ambulando (ps :!-: P0) 
+ambulando (ps :!-: PRaw (_ := RawSubMod (x,m) m')) =
+  ambulando (ps :<: Middle x (L0 :!-: PRaw m') :!-: PRaw m)
+ambulando (ps :!-: PRaw (_ := RawModComm mrs m))   = ambulando (ps :!-: PRaw m) -- bad: binning the comment
 ambulando (ps :!-: tip) = (ps :!-: tip)
 
 -- b : Bool signifies if Middle is allowed
