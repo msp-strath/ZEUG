@@ -143,21 +143,21 @@ bake ps ns (RawComm (_ := t) _)                      = bake ps ns t -- should de
 
 boil :: PZ True v w -> Vec Naming n -> RawHd -> [Tm (Syn n) w] -> TC (Tm (Syn n)) w
 boil ps ns (RawTy (_ := t) (_ := ty)) ts = bake ps ns t >>>= \ t -> bake ps ns ty >>>= \ ty ->
-  Yes (En (foldl (:$) (t ::: ty) ts))
+  Yes (En ((t ::: ty) $$$ ts))
 boil ps ns (RawVar (x,xs)) ts = case blah x ns of
   Left x  -> resolve (x,xs) ps >>>= \ res -> case res of
-      RParam x   -> Yes (En (foldl (:$) (P x) ts))
+      RParam x   -> Yes (En (P x $$$ ts))
       RGlob f tz -> case globKind f of
         (sz :=> _) -> case help sz (fmap vclosed tz <>> ts) of
           Nothing -> No
-          Just (g,ts) -> Yes (En (foldl (:$) (f :% g) ts))
+          Just (g,ts) -> Yes (En ((f :% g) $$$ ts))
           where
           help :: LStar KStep Zero m -> [Tm (Syn n) w] -> Maybe (Env (Syn n) m w, [Tm (Syn n) w])
           help L0 ts = return (E0, ts)
           help (sz :<: KS _) ts = do
             (g,t:ts) <- help sz ts
             return (ES g t,ts)
-  Right i -> if null xs then Yes (En (foldl (:$) (V i) ts)) else No
+  Right i -> if null xs then Yes (En (V i $$$ ts)) else No
 
 blah :: NameStep -> Vec Naming n -> Either NameStep (Fin n)
 blah x VNil = Left x

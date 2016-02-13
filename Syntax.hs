@@ -41,7 +41,7 @@ module Syntax(
   VarOperable(..),
   VarOp(..),
   LongName,
-
+  ($$$)
   ) where
 import Utils
 import Unsafe.Coerce
@@ -70,6 +70,19 @@ data En (p :: Phase)(w :: World) where
   -- type annotation
   (:::) :: Tm (Syn n) w -> Tm (Syn n) w -> En (Syn n) w
 
+data Tm (p :: Phase)(w :: World) where
+  Let  :: En (Syn n) w -> Tm (Syn (Suc n)) w -> Tm (Syn n) w
+  -- building blocks
+  Atom :: String -> Tm p w
+  (:&) :: Tm p w -> Tm p w -> Tm p w
+  Lam  :: Body p w -> Tm p w
+  -- elimination forms
+  En   :: En p w -> Tm p w
+
+-- iterated application
+($$$) :: En p w -> [Tm p w] -> En p w
+e $$$ xs = foldl (:$) e xs
+
 instance Eq (En (Syn n) w) where
   V x == V y = x == y
   P x == P y = x == y
@@ -83,15 +96,6 @@ instance Eq (En (Syn n) w) where
 instance Show (En (Syn m) n) where
   show (P x) = "P " ++ show x
   show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
-
-data Tm (p :: Phase)(w :: World) where
-  Let  :: En (Syn n) w -> Tm (Syn (Suc n)) w -> Tm (Syn n) w
-  -- building blocks
-  Atom :: String -> Tm p w
-  (:&) :: Tm p w -> Tm p w -> Tm p w
-  Lam  :: Body p w -> Tm p w
-  -- elimination forms
-  En   :: En p w -> Tm p w
 
 instance Eq (Tm (Syn n) w) where
   Let e t  == Let e' t'  = e == e' && t == t'

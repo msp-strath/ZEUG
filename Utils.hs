@@ -80,6 +80,7 @@ lextend f (xs :<: x) = lextend f xs >>> f x
 
 lmap :: (forall a b . r a b -> s a b) -> LStar r a b  -> LStar s a b
 lmap f xs = lextend (\ x -> L0 :<: f x) xs
+
 data RStar r a b where
   R0    :: RStar r a a
   (:>:) :: r a b -> RStar r b c -> RStar r a c
