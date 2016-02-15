@@ -177,7 +177,7 @@ El (Pi _S _T) <<== El (Pi _S' _T') = do
   _S' !- \ x -> _T / x <<== _T' / x
 
 El (Sg _S _T) <<== El (Sg _S' _T') = do
-  _S' <<== _S
+  _S <<== _S'
   _S !- \ x -> _T / x <<== _T' / x
 
 _ <<== _ = fail "not a subkind"
