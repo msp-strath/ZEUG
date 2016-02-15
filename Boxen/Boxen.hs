@@ -99,12 +99,18 @@ va chk t = do
 -- KINDS OF THING
 ------------------------------------------------------------------------------
 
+pattern N = A ""
+
 pattern Type = A "Type"
-pattern El _T = A "El" :& _T :& A ""
+pattern El _T = A "El" :& _T :& N
+pattern Seg = A "Seg"
+pattern Point z = A "Point" :& z :& N
 
 kindly :: TERM -> TC ()
 kindly Type        = return ()
 kindly (El _T)     = Type >:> _T
+kindly Seg         = return ()
+kindly (Point z)   = Seg :>: z
 kindly _           = fail "unkind"
 
 
@@ -113,8 +119,8 @@ kindly _           = fail "unkind"
 ------------------------------------------------------------------------------
 
 -- Types
-pattern Pi _S _T = A "Pi" :& _S :& L _T :& A ""
-pattern Sg _S _T = A "Sg" :& _S :& L _T :& A ""
+pattern Pi _S _T = A "Pi" :& _S :& L _T :& N
+pattern Sg _S _T = A "Sg" :& _S :& L _T :& N
 
 (>:>) :: KIND -> TERM -> TC ()
 infix 5 >:>
@@ -133,6 +139,19 @@ El (Pi _S _T) >:> L t = do
 El (Sg _S _T) >:> s :& t = do
   s <- va (El _S >:>) s
   El (_T / (s, _S)) >:> t
+
+Seg >:> N = return ()
+
+Seg >:> l :& r = do
+  Seg >:> l
+  Seg >:> r
+
+Point _ >:> A "0" = return ()
+Point _ >:> A "1" = return ()
+
+-- are the next two really necessary?
+-- Point (l :& r) >:> A "left" :& p   = Point l >:> p
+-- Point (l :& r) >:> A "right" :& p  = Point r >:> p
 
 want >:> E e = do
   got <- synth e
@@ -179,6 +198,12 @@ El (Pi _S _T) <<== El (Pi _S' _T') = do
 El (Sg _S _T) <<== El (Sg _S' _T') = do
   _S <<== _S'
   _S !- \ x -> _T / x <<== _T' / x
+
+Point _ <<== Point N = return ()
+
+Point (l :& r) <<== Point (l' :& r') = do
+  Point l <<== Point l'
+  Point r <<== Point r'
 
 _ <<== _ = fail "not a subkind"
 
