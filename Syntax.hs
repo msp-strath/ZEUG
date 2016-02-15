@@ -94,6 +94,7 @@ instance Eq (En (Syn n) w) where
 
 -- hopefully won't need this in a ghc > 8
 instance Show (En (Syn m) n) where
+  show (V i) = "V " ++ show i
   show (P x) = "P " ++ show x
   show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
   show (glob :% g) = "(:%) " ++ show (globName glob) ++ " " ++ show g
