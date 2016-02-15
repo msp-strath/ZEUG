@@ -96,6 +96,7 @@ instance Eq (En (Syn n) w) where
 instance Show (En (Syn m) n) where
   show (P x) = "P " ++ show x
   show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
+  show (glob :% g) = "(:%) " ++ show (globName glob) ++ " " ++ show g
 
 instance Eq (Tm (Syn n) w) where
   Let e t  == Let e' t'  = e == e' && t == t'
@@ -126,6 +127,12 @@ data Scope :: World -> * where
 data Env :: Phase -> Nat -> World -> * where
   E0 :: Env p Zero w
   ES :: Env p n w -> Tm p w -> Env p (Suc n) w
+
+deriving instance Show (Env (Syn m) n w)
+
+emap :: (Tm p w -> Tm p' w') -> Env p n w -> Env p' n w'
+emap f E0 = E0
+emap f (ES g t) = ES (emap f g) (f t)
 
 instance Eq (Env (Syn m) n w) where 
   g == g' = envHetEq g g'
@@ -249,7 +256,9 @@ instance VarOperable En where
       maybe (Right FZero) (fmap FSuc . help f) (thicken x r)
       -- either we have found the right one, or we can run  f on an
       -- old one
-  varOp f (hd :$ tl) = varOp f hd :$ varOp f tl
+  varOp f (hd :$ tl)  = varOp f hd :$ varOp f tl
+  varOp f (glob :% g) = glob :% emap (varOp f) g
+
 instance VarOperable Tm where
   varOp f (Let e t) = Let (varOp f e) (varOp (Weak f) t)
   varOp f (En e)    = En (varOp f e)
@@ -325,16 +334,16 @@ instance Weakenable (RefBinder)
 
 instance Weakenable Ref
 
-($/) :: Scope w -> Val w -> Val w
+($/) :: Worldly w => Scope w -> Val w -> Val w
 Scope g t $/ v = eval t (ES g v)
 
-($$) :: Val w -> Val w -> Val w
+($$) :: Worldly w => Val w -> Val w -> Val w
 En n     $$ v          = En (n :$ v)
 Lam s    $$ v          = s $/ v
 (v :& w) $$ Atom "Fst" = v
 (v :& w) $$ Atom "Snd" = w
 
-vfst, vsnd :: Val w -> Val w
+vfst, vsnd :: Worldly w => Val w -> Val w
 vfst p = p $$ Atom "Fst"
 vsnd p = p $$ Atom "Snd"
 
@@ -343,7 +352,7 @@ elookup FZero    (ES g v) = v
 elookup (FSuc i) (ES g v) = elookup i g
 
 class Eval t  where
-  eval :: t (Syn n) w -> Env Sem n w -> Val w
+  eval :: Worldly w => t (Syn n) w -> Env Sem n w -> Val w
 
 instance Eval En where
   eval (V x)      g = elookup x g
@@ -351,6 +360,11 @@ instance Eval En where
                     | otherwise             = En (P x)
   eval (t ::: ty) g = eval t g
   eval (f :$ s)   g = eval f g $$ eval s g
+  eval (glob :% g')    g = case globDefn glob of
+    Nothing -> En (glob :% newg')
+    Just t  -> eval (wk t) newg'
+    where
+    newg' = emap (\ t -> eval t g) g'
   
 instance Eval Tm where
   eval (Let e t)       g = eval t (ES g (eval e g))
@@ -359,7 +373,7 @@ instance Eval Tm where
   eval (t :& u)        g = eval t g :& eval u g  
   eval (Lam t)         g = Lam (Scope g t)
   
-val :: Eval t => t (Syn Zero) w -> Val w
+val :: Worldly w => Eval t => t (Syn Zero) w -> Val w
 val t = eval t E0
 
 etaquote :: Worldly w => Val w -> Val w -> Tm (Syn Zero) w
@@ -381,7 +395,14 @@ netaquote (e :$ s) = case netaquote e of
   (p', Sg dom cod) -> case s of
     Atom "Fst" -> (Fst p', dom)
     Atom "Snd" -> (Snd p', cod $/ En (Fst e))
-
+netaquote (glob :% g) = case globKind glob of
+  del :=> t -> (glob :% help del g, eval (wk t) g)
+  where
+    help :: Worldly w => LStar KStep Zero n -> Env Sem n w -> Env (Syn Zero) n w
+    help L0 E0 = E0
+    help (del :<: KS s) (ES gamma v) =
+      ES (help del gamma) (etaquote (eval (wk s) gamma) v)
+   
 instance Worldly w => Eq (Ne w) where
   n == n' = fst (netaquote n) == fst (netaquote n')
 

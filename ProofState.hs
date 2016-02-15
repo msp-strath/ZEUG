@@ -206,3 +206,8 @@ resolve (xi,nsteps) = lookOut xi
 
 testRig :: String -> String
 testRig s = ugly 0 (ambulando ((L0,supply0) :!-: PRaw (snd (head (parses (sub bigMod) (headline (layout s)))))))
+
+ftestRig :: String -> IO ()
+ftestRig s = do
+  x <- readFile s
+  putStrLn (testRig x)
