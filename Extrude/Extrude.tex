@@ -1,0 +1,483 @@
+\documentclass{article}
+%%\usepackage{fourier} %% \widearc
+\usepackage{mathabx} %% \overgroup \wideparen
+\usepackage{upgreek}
+\usepackage{pig}
+
+\ColourEpigram
+
+\begin{document}
+\title{Excuse My Extrusion}
+\author{Conor McBride and some friends, probably}
+\maketitle
+
+\newcommand{\blob}{\orange{\bullet}}
+\newcommand{\VP}[3]{#2\!\!\mathrel{\blue{\overgroup{\;\black{#1}\;}}}\!\!#3}
+
+\newcommand{\stk}[1]{\begin{array}{@{}c@{}}#1\end{array}}
+
+\section{Ordinary Things Before Cubes}
+
+\newcommand{\TYPE}[1]{\textsc{type}\;#1}
+\newcommand{\HAS}[2]{#1 \ni #2}
+\newcommand{\IS}[2]{#1 \in #2}
+\newcommand{\SUB}[2]{#1 \le #2}
+\newcommand{\CX}[1]{\dashv #1}
+
+\newcommand{\hb}{\!:\!}
+\newcommand{\sbs}[2]{\lgroup #1/#2\rgroup}
+
+\newcommand{\PI}[3]{\blue{(}#1\hb#2\blue{)} \mathrel{\blue{\to}} #3}
+\newcommand{\LA}[2]{\red{\uplambda}\,#1 \mathrel{\red{\to}} #2}
+\newcommand{\NE}{\underline}
+
+\[\stk{
+\Rule{\IS e S \quad\SUB S T}
+     {\HAS{T}{\NE{e}}}
+\qquad
+\Rule{\TYPE S \quad\HAS S s}
+     {\IS {s\hb S} S}
+\qquad
+\Rule{\CX{x\hb S}}
+     {\IS x S}
+\\
+\Rule{\TYPE S \quad x\hb S \vdash \TYPE T}
+     {\TYPE {\PI xST}}
+\qquad
+\Rule{x\hb S \vdash \HAS T t}
+     {\HAS {\PI xST} {\LA xt}}
+\qquad
+\Rule{\IS f {\PI xST}\quad \HAS S s}
+     {\IS {f\:s} {T\sbs{s\hb S}x}}
+\\
+\Rule{\SUB{S'} S \quad x\hb S'\vdash\SUB T {T'}}
+     {\SUB{\PI xST}{\PI {x'}{S'}{T'}}}
+}\]
+
+
+\section{Points, Paths}
+
+\newcommand{\SYM}[1]{{#1}^\degree}
+\newcommand{\POINT}[1]{\textsc{point}\;#1}
+\newcommand{\PL}{\red{0}}
+\newcommand{\PR}{\red{1}}
+\newcommand{\IA}[1]{\left< #1\right>}
+\newcommand{\IL}[2]{\red{\left<\right.}\!#1\!\red{\left.\right>} #2}
+\newcommand{\EQ}{\mathrel{\blue{=}}}
+
+\[
+\Axiom{\POINT \PL}
+\qquad
+\Axiom{\POINT \PR}
+\qquad
+\Rule{\dashv \IA{i}}
+     {\POINT i}
+\qquad
+\Rule{\POINT p\quad \POINT p_0 \quad \POINT p_1}
+     {\POINT p[p_0-p_1]}
+\]
+
+The evaluation rules for points are
+\[
+  \PL [p_0-p_1] \equiv p_0 \qquad \PR [p_0-p_1] \equiv p_1
+\]
+
+\newcommand{\pn}{\textsc{pnorm}}
+The normal form of a point in a given context is computed as follows:
+\[\begin{array}{lcl}
+\pn\: \cdot\: \PL & \equiv & \PL \\
+\pn\: \cdot\: \PR & \equiv & \PR \\
+\pn\: \cdot\: (\PL [p_0-p_1]) & \equiv & \pn\: \cdot\: p_0 \\
+\pn\: \cdot\: (\PR [p_0-p_1]) & \equiv & \pn\: \cdot\: p_1 \\
+\pn\: (\Gamma,x\hb S)\: p   & \equiv & \pn\: \Gamma\: p \\
+\pn\: (\Gamma,\IA{i})\: p   & \equiv & \mbox{if}\;j\equiv k\;\mbox{then}\;j\;\mbox{else}\;i [j-k]\\
+ && \mbox{where}\; j\equiv\pn\:\Gamma\: p\sbs \PL i;\; k\equiv \pn\:\Gamma\: p\sbs \PR i
+\end{array}\]
+
+For display purposes, it is polite to write $i[\PL-\PR]$ as $i$ and $i[\PR-\PL]$ as $\SYM i$.
+
+Type path types are inhabited by abstraction over the interval $\IL i R$, giving a type which deforms
+continuously over the interval, coinciding with the left end required when $i\equiv\PL$ and the right end
+when $i\equiv\PR$.
+\[
+\Rule{\TYPE S \quad \TYPE T}
+     {\TYPE {S \EQ T}}
+\qquad
+\Rule{\IA{i} \vdash \TYPE R \qquad S\equiv R\sbs \PL i \qquad R\sbs \PR i \equiv T}
+     {\HAS {S \EQ T}{\IL i R}}
+\qquad
+\Rule{\IS Q {S \EQ T}\quad \POINT p}
+     {\TYPE {\NE{Q\:p}}}
+\]
+
+Value paths are a little more fiddly. Firstly, one must form them `over' type paths which establish the basis for making a connection between values. Secondly, it is not compulsory to choose the endpoints. The symbol $\blob$ (`blob') stands for an unspecified endpoint in a value path type. I also overload it as the predicate $\blob \cdot$ which tests whether an endpoint is just a blob. Endpoints, if specified, must have the types given at the endpoints of the type path.
+\[
+\Rule{\IS Q {S \EQ T}\quad \vee\stk{\blob s \\ \HAS S s} \quad
+                           \vee\stk{\blob t \\ \HAS T t}}
+     {\TYPE {\VP Q s t}}
+\]
+
+To construct a value path, it is again necessary to abstract over the interval and construct a value which fits the type path at each point on it. If endpoints are specified, the abstracted value must coincide with them at the relevant end.
+\[
+\Rule{\IA{i} \vdash \HAS {\NE{Q\:i}} r \quad
+      \vee\stk{\blob s \\ \HAS {\NE{Q\:\PL}} {s\equiv r\sbs \PL i}} \quad 
+      \vee\stk{\blob t \\ \HAS {\NE{Q\:\PR}} {r\sbs \PR i \equiv t}}}
+     {\HAS {\VP Q s t} {\IL i r}}
+\qquad
+\Rule{\IS q {\VP Q s t}\quad \POINT p}
+     {\IS {q\:p} {\NE{Q\:p}}}
+\]
+
+We can think of value paths as subtypes in a lattice, in accordance with their specificity of endpoints.
+(Is this subtyping really necessary?) 
+\[
+\Axiom{\SUB {\VP Q s \blob} {\VP Q \blob \blob}}
+\qquad
+\Axiom{\SUB {\VP Q \blob t} {\VP Q \blob \blob}}
+\qquad
+\Axiom{\SUB {\VP Q s t} {\VP Q s \blob}}
+\qquad
+\Axiom{\SUB {\VP Q s t} {\VP Q \blob t}}
+\]
+
+Let us adopt some convenient shorthands. Choosing bound variables to avoid capture (as is trivial in a de Bruijn implementation),
+\[
+Q[p-p'] \equiv \IL i {Q\:i[p-p']}
+\qquad
+\SYM Q \equiv Q[1-0]
+\]
+
+Weakening, we readily have that constant paths give reflexivity. Let us write $\IL {} t$ to emphasize that there is no use of the bound variable. Derivably,
+\[
+\Rule{\TYPE{T}}
+     {\HAS {T \EQ T}{\IL {} T}}
+\qquad
+\Rule{\HAS T t}
+     {\HAS {\VP {\IL {} T} t t} {\IL {} t}}
+\]
+
+
+
+\section{Extrusion}
+
+\newcommand{\EXR}{\mathop{\green{\raisebox{0.03in}{$\frown$}\!\!\bullet}}}
+\newcommand{\EXL}{\mathop{\green{\bullet \!\!\raisebox{0.03in}{$\frown$}}}}
+
+\[
+\Rule{\IS Q {S \EQ T} \qquad \HAS S s}
+     {\IS {s \EXR Q} {\VP Q s \blob}}
+\]
+
+For cosmetic purposes, let us define leftward extrusion:
+\[
+\Rule{\IS Q {S \EQ T} \qquad \HAS T t}
+     {\IS {Q \EXL t} {\VP Q \blob t}}
+\qquad
+Q \EXL t \equiv \SYM{(t \EXR \SYM Q)}
+\]
+
+
+\newcommand{\PA}[1]{\lgroup #1 \rgroup}
+
+We need to arrange for extrusion to compute for all the types we can
+encounter. Let us start with functions. I write $S\PA i$, etc, marking
+explicitly the dependency on $i$, in order to abbreviate substitutions.
+I further write $S\PA{p-p'} \equiv \IL j {S\PA{j[p-p']}}$.
+
+\[
+f\EXR \IL i {\PI x {S\PA{i}} {T\PA{i,x}}} \equiv
+  \IL i {\LA x {\begin{array}[t]{@{}l@{\;}l@{\,}c@{\,}l@{}}
+         \mathbf{let} & \bar x & \equiv & S\PA{\PL-i} \EXL x \\
+                      & \bar y & \equiv & f\:(\bar x\:\PL)
+                                      \EXR \IL j {T\PA{j[\PL-i],\bar x\:j}} \\
+         \mathbf{in}  & \multicolumn{3}{@{}l}{\bar y\:\PR}
+         \end{array}}}
+\]
+
+Why does this typecheck? Well,
+\[
+\bar{y}\:1 \in T\PA{i,\bar{x}\:1} \equiv T\PA{i,x}
+\]
+so the typical point on the value path fits the typical point on the type path.
+But we must also check the left end, taking $i\equiv\PL$.
+\[
+  (f \EXR \IL i {\PI x {S\PA{i}} {T\PA{i,x}}})\:\PL \quad
+\mbox{makes}\quad\begin{array}[t]{@{}l@{\,}c@{\,}l}
+  \bar x &\equiv& (\IL j {S\PA\PL}) \EXL x \\
+  \bar y &\equiv& f\:(\bar{x}\:\PL)  \EXR (\IL j {T\PA{\PL,\bar{x}\:j}})
+  \end{array}
+\]
+So, if we can arrange for extrusion over constant type paths to produce constant
+value paths, we shall have that $\bar x\:j\equiv x$ and thence that
+$\bar y\:j\equiv f\:x$. The left end of the extrusion thus transports $f$ to its
+$\eta$-expansion, so let us ensure that the $\eta$-laws hold.
+
+The (contentious) suggestion is that the following should hold judgmentally.
+\[
+\HAS{\VP {\IL{}T} t \blob}{t\EXR\IL{}T \equiv \IL{}t}
+\]
+
+
+Let us now consider how to extrude across path types. What is
+\[
+Q \EXR \IL i {S\PA i \EQ T\PA i} \equiv ?
+\]
+? We have $Q \in S\PA\PL \EQ T\PA\PL$, and of course we can form paths
+$S\PA{i-\PL}$ and $T\PA{\PL-i}$, but can we compose these three?
+
+
+\section{Transitivity as Composition}
+
+We don't get transitivity for paths for free from substitutivity, because
+substitutivity is derived from extrusion and extrusion is what we are trying to
+make compute. We shall have to add a composition operator.
+\newcommand{\PC}{\mathop{\red{\circ}}}
+\[
+\Rule{\IS {Q_0} {R\EQ S_0} \quad \IS {Q_1} {S_1\EQ T}\quad S_0\equiv S_1}
+     {\IS {Q_0\PC Q_1} {R \EQ T}}
+\qquad
+\stk{
+(Q_0\PC Q_1)\:\PL \equiv Q_0\:\PL \\
+(Q_0\PC Q_1)\:\PR \equiv Q_1\:\PR }
+\]
+
+Of course, we shall also need composition for value paths.
+\[
+\Rule{\IS {q_0} {\VP {Q_0} r {s_0}}\quad \IS {q_1} {\VP {Q_1} {s_1} t} \quad
+      Q_0\:\PR\equiv Q_1\:\PL \quad \HAS {Q_0\:\PR} {q_0\:\PR \equiv q_1\:\PL}}
+     {\IS {q_0} {\VP {Q_0\PC Q_1} r t}}
+\]
+with the same computation rules.
+
+Now we can define extrusion across a composition.
+\[
+r\EXR{(Q_0\PC Q_1)} \equiv
+  \begin{array}[t]{@{}l@{\;}l@{\,}c@{\,}l@{}}
+      \mathbf{let} & {\bar r}_0 & \equiv & r \EXR Q_0 \\
+                   & {\bar r}_1 & \equiv & {\bar r}_0\:\PR \EXR Q_1 \\
+      \mathbf{in}  & \multicolumn{3}{@{}l}{{\bar r}_0\PC {\bar r}_1}
+  \end{array}
+\]
+
+We can also finish the definition of extrusion across a type path type.
+\[
+Q \EXR \IL i {S\PA i \EQ T\PA i} \equiv S\PA{i-\PL}\PC Q \PC T\PA{\PL-i}
+\]
+
+And we had better give the counterpart for value path types.
+\[
+q \EXR \IL i {\VP {Q\PA i} {s\PA{i}} {t\PA{i}}} \equiv
+  \begin{array}[t]{@{}l@{\;}l@{\,}c@{\,}l@{}}
+      \mathbf{let} & {\bar s} & \equiv & \mbox{if}\;\blob s\;
+                           \mbox{then}\; Q\PA{i-\PL}\:\PL \EXL q\:\PL\;\mbox{else}\;s\PA{i-0} \\
+                   & {\bar t} & \equiv & \mbox{if}\;\blob t\;
+                           \mbox{then}\; q\:\PR \EXR Q\PA{\PL-i}\:\PR \;\mbox{else}\;t\PA{0-i} \\
+      \mathbf{in}  & \multicolumn{3}{@{}l}{{\bar s}\PC q \PC {\bar t}}
+  \end{array}
+\]
+
+What is the equational theory of composition? Is it just a plain constructor?
+I think not. It has laws which we must somehow respect.
+\[
+\HAS {S\EQ T}{(\IL {} S : S\EQ S)\PC Q \equiv Q} \qquad
+\HAS {S\EQ T}{Q\PC(\IL {} T : T\EQ T)\PC Q \equiv Q}
+\]
+and similarly for value paths. Also, composition should be associative.
+
+Moreover, composition should commute with canonical constructors.
+\[\begin{array}{ll}
+ & (\IL{i}{\PI x {S\PA{i}}{T\PA{i,x}}})\PC
+    (\IL{i}{\PI x {S'\PA{i}}{T'\PA{i,x}}}) \\
+  \equiv &
+  \IL{i}{\PI x {S\PA{0-1}\PC S'\PA{0-1}\:i}{(\IL{j}{T\PA{j,?}})\PC (\IL{j}{T'\PA{j,?}})\:i}}
+\end{array}\]
+Ah. There's a problem even with \emph{stating} this property. To see why,
+consider the problem
+\[
+  \IA{i},x\hb S\PA{0-1}\PC S'\PA{0-1}\:i \vdash \TYPE ?
+\]
+We need to build a composite dependent type from $T\PA{-,-}$ and
+$T'\PA{-,-}$ which agrees with $x$ at every point $i$. Near $\PL$, $x$
+belongs to $S\PA{-}$, so we need to give $T\PA{-,-}$, but at whatever
+notional point we weld $S\PA{\PR}$ to $S'\PA{\PL}$, we need to switch
+(continuously), from $T\PA{\PR,x}$ to $T'\PA{\PL,x}$. We do not have a
+way to talk about that point, or to build dependent things by
+composition at a specific point.
+
+It seems that we have two options: do without, or figure out how to
+engineer correspondence at internal points in paths.
+
+
+\section{Refining Path Types}
+
+I had a few ideas about path types and internal points. I don't know
+if we want to go this way, but I thought I'd write them down before I
+forget them.
+
+The key is to consider $\EQ$ to be the type former for the simplest
+notion of path, but to allow more complex notions, with internal
+points. We need to define valid path forms and generalise path types.
+\newcommand{\TPATH}{\textsc{tpath}\:}
+\newcommand{\TP}[1]{\mathrel{\blue{\left[\black{#1}\right]}}}
+\[
+\Axiom{\TPATH \EQ}\qquad
+\Rule{\TPATH\pi\quad \TYPE S\quad\TPATH\rho}
+     {\TPATH\TP{\pi S \rho}} \qquad
+\Rule{\TYPE R\quad \TPATH\pi \quad \TYPE T}
+     {\TYPE {R\pi T}}
+\]
+\newcommand{\PP}{\red{\cdot}}
+The idea is that a path type $R\TP{\EQ S \EQ}T$ meets $R$ at $\PL$ and
+$T$ at $\PR$, but also has a \emph{midpoint}, $\PP$, where it meets
+$S$. There's an obvious notion of refinement for paths, inducing
+subtyping of path types.
+\[
+\Axiom{\TP{\pi S \rho} \le \EQ}\qquad
+\Rule{\pi\le\pi'\quad\rho\le\rho'}
+     {\TP{\pi S \rho} \le \TP{\pi' S \rho'}} \qquad
+\Rule{\pi\le\rho}
+  {R\pi T \le R\rho T}
+\]
+Each refinement of $\EQ$ puts a midpoint in a segment, so the point
+values can sensible represented as binary fractions between $\PL$ and
+$\PR$, written with an initial binary point and omitting the last
+$\PR$. So $\PP$ is a half, $\PP\PL$ a quarter, $\PP\PR$ three
+quarters, and so on: the bits tell you whether to step left or right
+until the segment whose midpoint is being selected.
+\newcommand{\LP}[2]{\mathrel{\red{\left[\black{#1}\bullet\black{#2}\right]}}}
+The corresponding introduction form also describes the segment structure
+of a path. (Why? See below.) Segment structures are just binary trees. The blank
+segment structure has no internal points. It's not hard to see when
+a segment structure refines a path type.
+\newcommand{\SEG}{\textsc{lpath}\:}
+\[
+\Axiom{\SEG}\qquad
+\Rule{\SEG p\quad\SEG r}
+     {\SEG \LP p r}\qquad
+\Axiom{p \preceq \EQ}\qquad
+\Rule{p\preceq\pi\quad r\preceq\rho}
+     {\LP p r \preceq \TP{\pi S \rho}}
+\]
+Now we may generalise the interval abstraction to allow more
+information.
+\[
+\Rule{p\preceq \pi\quad \IA{i\:p} \vdash \TYPE S}
+     {\HAS{R\pi T}{\IL{i\:p} S}}
+\]
+The point is this: even if the path type does not specify particular
+internal points, we can nonetheless construct a path in segments. The
+path type identifies a minimal collection of internal points which
+must exist in any such path, but a path construction may have more.
+If we are to justify the refinement subtyping for path types, we must
+be sure that constructions which use greater detail can still be
+accessed with less detail.
+
+(What is the interaction with rescaling?)
+
+The segment structure gives a rigid framework of internal points,
+allowing coherent constructions, but subtyping throws that rigidity
+away, after the fact. Judgmental equality is typed, and the tighter
+the subtype, the less forgiving the equality: the additional segment
+structure of paths unspecified by type is flattened. What we do know
+is that an interval variable with nontrivial segment structure can be
+substituted by its midpoint. We can perform that move at any point
+in a construction.
+\newcommand{\JC}[1]{\mathrel{\red{-\!\langle\black{#1}\rangle\!-}}}
+\newcommand{\LH}{\green{\triangleleft\!\!\bullet}}
+\newcommand{\RH}{\green{\bullet\!\!\triangleright}}
+\[
+\Rule{\Gamma,\IA{i\:p},\Delta\PA{\LH}\vdash \TYPE S\PA i \quad
+      \Gamma,\IA{i\:r},\Delta\PA{\RH}\vdash \TYPE T\PA i \quad
+      \Gamma,\Delta\PA{\PP} \vdash S\PA\PR \equiv T\PA\PL}
+     {\Gamma,\IA{i\:\LP p r},\Delta\PA{i}\vdash
+        \TYPE{S\PA i\JC i T\PA i}}
+\]
+This rule slices space in two and rescales the pieces to run from
+$\PL$ to $\PR$. Crucially, we have to be able to focus separately
+on the left part and the right part of the interval, which is what
+the segment selections $\LH$ and $\RH$ do.
+\[
+  (S\JC i T)\PA{\LH/i} \equiv S\qquad
+  (S\JC i T)\PA{\RH/i} \equiv T
+\]
+(But what about the rest of it? What about rescaling, \emph{indeed}?)
+We should make sure that we can always distribute $\JC i$ out as far
+as we like, up to the abstraction which introduces $i$. The segment selection
+behaviour should amount to distribution followed by projection of the
+left or right part. Note that
+\[
+  (S\PA i\JC i T\PA i)\PA{\PP/i} \equiv S\PA\PR \equiv T\PA\PL
+\]
+
+Path composition is now derivable, with a more exciting type
+\[
+Q\PC Q' \equiv (\IL{i\:\LP{}{}} Q\:i\JC i Q'\:i :
+               Q\:\PL\TP{\EQ Q\:\PR\EQ}Q'\:\PR)
+\]
+with $Q'\:\PL$ also permitted in the middle. That's to say, the
+composition is constructed in two halves, and we are not obliged to
+forget what is at the midpoint. Subtyping recovers the original type
+of more plastic compositions.
+
+(Rescaling: does it just match the segment structure? If so, can we
+have loopy paths?)
+
+We should be able to project the segments from a path.
+
+(What's the value-path story?)
+
+But I digress. There's a power-to-weight calculation needed here.
+
+
+
+\section{Sigma Types}
+\newcommand{\SG}[3]{\blue{(}#1\hb#2\blue{)} \mathrel{\blue{\times}} #3}
+\newcommand{\pr}{\red{,}\:}
+\newcommand{\car}{\green{\textsc{car}}\:}
+\newcommand{\cdr}{\green{\textsc{cdr}}\:}
+
+\[
+\Rule{\TYPE S \quad x\hb S \vdash \TYPE T}
+     {\TYPE {\SG xST}}
+\qquad
+\Rule{\HAS S s \quad \HAS{T\sbs{s\hb S}x}t}
+     {\HAS {\SG xST}{s\pr t}}
+\]
+\[
+\Rule{\IS e {\SG xST}}
+     {\IS {\car e} S}
+\qquad
+\Rule{\IS e {\SG xST}}
+     {\IS {\cdr e}{T\sbs{\car e}x} }
+\qquad
+\begin{array}{l}
+\car(s\pr t : \SG xST)\equiv s\\
+\cdr(s\pr t : \SG xST)\equiv t\\
+\end{array}
+\]
+
+
+\section{Univalence}
+
+
+
+\section{The Universe and J}
+
+
+
+\section{Symmetric Inversion}
+
+Every path has an inverse, and if we compose a path with its inverse,
+we should obtain an identity path. It seems unlikely that we can
+engineer this path to be definitionally equal to that given by
+reflexivity. We need somehow to obtain the symmetry property
+\[
+  \green{\mathrm{Inv}}\:(Q\hb S\EQ T) :
+  \VP {S\EQ S} {(Q\PC \SYM Q)} {(\IA{} S)}
+\]
+
+This seems like a job for J. But it also seems like the thing that
+will require the each-way functions to be coherent.
+
+
+\end{document}
