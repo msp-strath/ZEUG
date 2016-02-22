@@ -57,13 +57,13 @@ data RawHd
 
 tag :: ParseTokens String
 tag = sym >>= \ x -> case x of
-  '\'' : s  -> return s
-  _         -> empty
+  '\'' : s -> return s
+  _        -> empty
 
 var :: ParseTokens String
 var = sym >>= \ x -> case x of
   c : s | elem c "'\\-" -> empty
-  _ | elem ':' x -> empty
+  _     | elem ':' x -> empty
   _ -> return x
 
 bigMod :: ParseTokens RawModule

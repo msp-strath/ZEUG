@@ -3,7 +3,8 @@
              UndecidableInstances, MultiParamTypeClasses,
              FunctionalDependencies, TypeOperators,
              FlexibleInstances, GADTs, DeriveFunctor, RankNTypes,
-             EmptyCase, TypeFamilies, PatternSynonyms, GeneralizedNewtypeDeriving #-}
+             EmptyCase, TypeFamilies, PatternSynonyms,
+             GeneralizedNewtypeDeriving #-}
 module TypeCheck where
 
 import Utils
@@ -30,21 +31,18 @@ instance Dischargeable f g => Dischargeable (TC f) (TC g) where
   discharge x (Yes f) = Yes (discharge x f)
 
 isType :: Worldly w => TERM w -> TC Happy w
-isType (Let e ty) = goodElim e >>>= \ (v :&: vty) ->
+isType (Let e ty)   = goodElim e >>>= \ (v :&: vty) ->
   (Local v,vty) !- \ x -> isType (ty // x)
-isType (En ety) =
-  enType ety >>>= \ ty ->
-    case ty of
-      Set -> Yes Happy
-      _    -> No
-isType Set      = Yes Happy
+isType (En ety)     = enType ety >>>= \ ty ->
+  case ty of
+    Set -> Yes Happy
+    _   -> No
+isType Set          = Yes Happy
 isType (Pi sty tty) = 
-  goodType sty >>>= \ sty ->
-    (Decl,sty) !- \ x -> isType (tty // x)
+  goodType sty >>>= \ sty -> (Decl,sty) !- \ x -> isType (tty // x)
 isType (Sg sty tty) = 
-  goodType sty >>>= \ sty ->
-    (Decl,sty) !- \ x -> isType (tty // x)
-isType _ = No
+  goodType sty >>>= \ sty -> (Decl,sty) !- \ x -> isType (tty // x)
+isType _            = No
 
 goodType :: Worldly w => TERM w -> TC Val w
 goodType t = isType t >>>= \ _ -> Yes (val t)
@@ -55,8 +53,8 @@ ty         >:> Let e t  = goodElim e >>>= \ (v :&: vty) ->
 Set        >:> t        = isType t -- won't work with hierarchy
 Pi dom cod >:> Lam t    = (Decl,dom) !- \ x -> (wk cod $/ x) >:> (t // x)
 Sg dom cod >:> (t :& u) = dom `goodTerm` t >>>= \ vt -> (cod $/ vt) >:> u
-want        >:> En e     = enType e >>>= \ got -> got `subType` want
-_           >:> _        = No
+want       >:> En e     = enType e >>>= \ got -> got `subType` want
+_          >:> _        = No
 
 goodTerm :: Worldly w => Val w -> TERM w -> TC Val w
 ty `goodTerm` t = ty >:> t >>>= \ _ -> Yes (val t)
@@ -68,8 +66,8 @@ enType (e :$ s)   = goodElim e >>>= \ (v :&: ty) -> case ty of
   Sg dom cod -> case s of
     Atom "Fst" -> Yes dom
     Atom "Snd" -> Yes (cod $/ vfst v)
-    _ -> No
-  _ -> No
+    _          -> No
+  _          -> No
 enType (x :% g)   = case globKind x of
   ks :=> cod -> goodInstance ks g >>>= \ vs -> Yes $ eval (wk cod) vs
 enType (t ::: ty) =
@@ -77,7 +75,7 @@ enType (t ::: ty) =
   vty >:> t   >>>= \ _ -> Yes vty 
 
 goodInstance :: Worldly w => 
-            LStar KStep Zero n -> Env (Syn Zero) n w -> TC (Env Sem n) w
+                LStar KStep Zero n -> Env (Syn Zero) n w -> TC (Env Sem n) w
 goodInstance (ks :<: KS ty) (ES g t) = 
   goodInstance ks g >>>= \ vs ->
   eval (wk ty) vs `goodTerm` t >>>= \ v ->
@@ -89,11 +87,11 @@ goodElim e = enType e >>>= \ vty -> Yes (val e :&: vty)
 
 -- subtype is just equality at the mo'
 subType :: Worldly w => Val w -> Val w -> TC Happy w
-Set `subType` Set = Yes Happy
+Set          `subType` Set          = Yes Happy
 Pi dom0 cod0 `subType` Pi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
   (Decl,dom1) !- \ x -> (wk cod0 $/ x) `subType` (wk cod1 $/ x)
 Sg dom0 cod0 `subType` Sg dom1 cod1 = dom0 `subType` dom1 >>>= \ _ ->
   (Decl,dom0) !- \ x -> (wk cod0 $/ x) `subType` (wk cod1 $/ x)
-En e0 `subType` En e1 = if e0 == e1 then Yes Happy else No
-_     `subType` _     = No
+En e0        `subType` En e1        = if e0 == e1 then Yes Happy else No
+_            `subType` _            = No
 
