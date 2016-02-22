@@ -98,12 +98,7 @@ instance Show (En (Syn m) n) where
   show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
   show (glob :% g) = "(:%) " ++ show (globName glob) ++ " " ++ show g
 
-instance Eq (Tm (Syn n) w) where
-  Let e t  == Let e' t'  = e == e' && t == t'
-  Atom s   == Atom s'    = s == s'
-  (t :& s) == (t' :& s') = t == t' && s == s' 
-  Lam t    == Lam t'     = t == t'
-  En e     == En e'      = e == e'
+deriving instance Eq (Tm (Syn n) w)
 
 deriving instance Show (Tm (Syn n) w)
 
@@ -138,8 +133,6 @@ envHetEq :: Env (Syn m) n w -> Env (Syn m) n' w -> Bool
 envHetEq E0       E0         = True
 envHetEq (ES g t) (ES g' t') = envHetEq g g' && t == t'
 envHetEq _        _          = False
-
---deriving instance Show (Env p n w)
 
 -- canonical things
 pattern Nil = Atom ""
