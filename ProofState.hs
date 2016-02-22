@@ -2,7 +2,6 @@
 
 module ProofState where
 
-import Control.Newtype
 import Utils
 import Layout
 import Raw
@@ -203,11 +202,3 @@ resolve (xi,nsteps) = lookOut xi
         Right _ -> lookInside xs mglob pz'
         -- carry on looking
         Left xi -> lookInside' xi pz
-
-testRig :: String -> String
-testRig s = ugly 0 (ambulando ((L0,supply0) :!-: PRaw (snd (head (parses (sub bigMod) (headline (layout s)))))))
-
-ftestRig :: String -> IO ()
-ftestRig s = do
-  x <- readFile s
-  putStrLn (testRig x)

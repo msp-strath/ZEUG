@@ -10,6 +10,11 @@ import Utils
 import Syntax
 import TypeCheck
 
+import Layout
+import Raw
+import ProofState
+
+-- type checker tests
 data Test where
   ISTYPE :: TERM W0 -> Test
   CHECK :: TERM W0 -> TERM W0 -> Test
@@ -56,4 +61,18 @@ failtests = map (fmap FAILS)
  ,("testLet",CHECK Set (En ((Lam (En (Set ::: En (V FZero))) ::: Pi Set Set) :$ Set)))
  ]
 
-main = mapM_ testReport (passtests ++ failtests)
+-- proof state tests
+testRig :: String -> String
+testRig s = ugly 0 (ambulando ((L0,supply0) 
+  :!-: PRaw (snd (head (parses (sub bigMod) (headline (layout s)))))))
+
+ftestRig :: String -> IO ()
+ftestRig s = do
+  x <- readFile s
+  putStrLn (testRig x)
+
+main = do 
+  mapM_ testReport (passtests ++ failtests)
+  -- can't do much else until we have a pretty printer
+  ftestRig "tests/tests.zoig"
+
