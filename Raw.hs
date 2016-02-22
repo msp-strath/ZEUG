@@ -161,9 +161,3 @@ rawTreeFormat = Format (:&&:) (gap *> bigTm <* gap) rawTreeFormat
 
 rawTest :: String -> [[RawTree]]
 rawTest = document rawTreeFormat . layout
-
--- parses nonsense (headline (layout "blah ( bler        )       berr"))
--- parses bigMod (headline (layout ""))
--- parses bigMod (headline (layout "(x : S)"))
--- parses bigMod (headline (layout "(x : S){x}"))
--- parses bigMod (headline (layout "(x : S){x = hello : world}"))

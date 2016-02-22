@@ -3,7 +3,7 @@
              UndecidableInstances, MultiParamTypeClasses,
              FunctionalDependencies, PatternSynonyms,
              FlexibleInstances, GADTs, DeriveFunctor, RankNTypes, EmptyCase,
-             TypeFamilies #-}
+             TypeFamilies, StandaloneDeriving #-}
 module Test where
 
 import Utils
@@ -14,18 +14,21 @@ import Layout
 import Raw
 import ProofState
 
--- type checker tests
-data Test where
-  ISTYPE :: TERM W0 -> Test
-  CHECK :: TERM W0 -> TERM W0 -> Test
-  NORM  :: ELIM W0 -> TERM W0 -> Test
-  FAILS :: Test -> Test
-  deriving Show
 
+data Test where
+  PARSE  :: String -> Test
+  ISTYPE :: TERM W0 -> Test
+  CHECK  :: TERM W0 -> TERM W0 -> Test
+  NORM   :: ELIM W0 -> TERM W0 -> Test
+  FAILS  :: Test -> Test
+
+deriving instance Show Test
 
 pattern INFER e t = CHECK t (En e)
 
 runTest :: Test -> TC Happy W0
+runTest (PARSE s) = 
+  if length (parses bigMod (headline (layout s))) == 1 then Yes Happy else No
 runTest (ISTYPE ty)  = isType ty
 runTest (CHECK ty t) = goodType ty >>>= \ vty -> vty >:> t
 runTest (NORM e nf) =
@@ -61,6 +64,14 @@ failtests = map (fmap FAILS)
  ,("testLet",CHECK Set (En ((Lam (En (Set ::: En (V FZero))) ::: Pi Set Set) :$ Set)))
  ]
 
+-- raw tests (checks for an unambiguous parse)
+
+rawTests = 
+ [("rawtest0",PARSE "")
+ ,("rawtest1",PARSE "(x : S)")
+ ,("rawtest2",PARSE "(x : S){x}")
+ ,("rawtest3",PARSE "(x : S){x = hello : world}")]
+
 -- proof state tests
 testRig :: String -> String
 testRig s = ugly 0 (ambulando ((L0,supply0) 
@@ -72,7 +83,7 @@ ftestRig s = do
   putStrLn (testRig x)
 
 main = do 
-  mapM_ testReport (passtests ++ failtests)
+  mapM_ testReport (rawTests ++ passtests ++ failtests)
   -- can't do much else until we have a pretty printer
   ftestRig "tests/tests.zoig"
 
