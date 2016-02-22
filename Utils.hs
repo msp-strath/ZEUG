@@ -25,6 +25,7 @@ vlookup :: Fin n -> Vec x n -> x
 vlookup FZero    (VCons x _ ) = x
 vlookup (FSuc i) (VCons _ xs) = vlookup i xs
 
+-- find the first x in the vector and return its index
 velemIndex :: Eq x => x -> Vec x n -> Maybe (Fin n)
 velemIndex x VNil          = Nothing
 velemIndex x (VCons x' xs) =
@@ -33,6 +34,7 @@ velemIndex x (VCons x' xs) =
   else
     fmap FSuc (velemIndex x xs)
 
+-- find the nth x in the vector and return its index
 velemIndex' :: Eq x => x -> Nat ->  Vec x n -> Maybe (Fin n)
 velemIndex' x n VNil          = Nothing
 velemIndex' x n (VCons x' xs) =
@@ -116,6 +118,6 @@ data Ex2 (f :: k -> l -> *)(j :: l) where
 
 type Dot f g = Ex (f :* g)
 
-newtype Flip {- ping 'eck -} f x y = Flip {pilf :: f y x}
+newtype Flip {- pin'eck -} f x y = Flip {pilf :: f y x}
 
 type RC r s x y = Dot (r x) (Flip s y)

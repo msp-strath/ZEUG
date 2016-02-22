@@ -90,8 +90,7 @@ instance Eq (En (Syn n) w) where
   (x :% g) == (x' :% g') = globHetEq x x' && envHetEq g g'
   (t ::: ty) == (t' ::: ty') = ty == ty' && t == t'
 
---deriving instance Show (En (Syn n) w)
-
+-- deriving instance Show (En (Syn n) w)
 -- hopefully won't need this in a ghc > 8
 instance Show (En (Syn m) n) where
   show (V i) = "V " ++ show i
@@ -107,7 +106,6 @@ instance Eq (Tm (Syn n) w) where
   En e     == En e'      = e == e'
 
 deriving instance Show (Tm (Syn n) w)
---deriving instance Show (Tm Sem w)
 
 infixr 4 :&
 
@@ -121,8 +119,6 @@ type family Body (p :: Phase) ::  World -> * where
 -- a closed closure
 data Scope :: World -> * where
   Scope :: Env Sem n w -> Tm (Syn (Suc n)) w -> Scope w
-
---deriving instance Show (Scope w)
 
 -- world indexed vectors would also do...
 data Env :: Phase -> Nat -> World -> * where
@@ -255,7 +251,7 @@ instance VarOperable En where
     help (Inst f h) r = help f r
     help (Abst f x) r =
       maybe (Right FZero) (fmap FSuc . help f) (thicken x r)
-      -- either we have found the right one, or we can run  f on an
+      -- either we have found the right one, or we can run f on an
       -- old one
   varOp f (hd :$ tl)  = varOp f hd :$ varOp f tl
   varOp f (glob :% g) = glob :% emap (varOp f) g
@@ -310,15 +306,17 @@ instance RefEmbeddable (En p) where
 instance RefEmbeddable (Tm p) where
   emb = En . emb
 
--- this doesn't need to be in this module as it uses extend and extrRef
-(!-) :: (Worldly w , Dischargeable f g) =>
-        (RefBinder w, Val w) -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
-                   (forall r . RefEmbeddable r => r w') -> f w') -> g w
-p !- f = discharge x (f (emb (extrRef x))) where
-  x = extend p
+(!-) :: (Worldly w , Dischargeable f g) 
+     => (RefBinder w, Val w) 
+     -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
+           (forall r . RefEmbeddable r => r w') -> f w') 
+     -> g w
+p !- f = discharge x (f (emb (extrRef x))) where x = extend p
 
-(//) :: (WorldLE w w' ~ True, VarOperable t) =>
-        t (Syn One) w -> En (Syn Zero) w' -> t (Syn Zero) w'
+(//) :: (WorldLE w w' ~ True, VarOperable t) 
+     => t (Syn One) w 
+     -> En (Syn Zero) w' 
+     -> t (Syn Zero) w'
 body // x = varOp (Inst IdVO x) body
 
 class Weakenable (t :: World -> *) where
@@ -356,23 +354,23 @@ class Eval t  where
   eval :: Worldly w => t (Syn n) w -> Env Sem n w -> Val w
 
 instance Eval En where
-  eval (V x)      g = elookup x g
-  eval (P x)      g | Local v <- refBinder x = v
-                    | otherwise             = En (P x)
-  eval (t ::: ty) g = eval t g
-  eval (f :$ s)   g = eval f g $$ eval s g
-  eval (glob :% g')    g = case globDefn glob of
+  eval (V x)        g = elookup x g
+  eval (P x)        g | Local v <- refBinder x = v
+                      | otherwise             = En (P x)
+  eval (t ::: ty)   g = eval t g
+  eval (f :$ s)     g = eval f g $$ eval s g
+  eval (glob :% g') g = case globDefn glob of
     Nothing -> En (glob :% newg')
     Just t  -> eval (wk t) newg'
     where
     newg' = emap (\ t -> eval t g) g'
   
 instance Eval Tm where
-  eval (Let e t)       g = eval t (ES g (eval e g))
-  eval (En e)          g = eval e g
-  eval (Atom s)        g = Atom s
-  eval (t :& u)        g = eval t g :& eval u g  
-  eval (Lam t)         g = Lam (Scope g t)
+  eval (Let e t) g = eval t (ES g (eval e g))
+  eval (En e)    g = eval e g
+  eval (Atom s)  g = Atom s
+  eval (t :& u)  g = eval t g :& eval u g  
+  eval (Lam t)   g = Lam (Scope g t)
   
 val :: Worldly w => Eval t => t (Syn Zero) w -> Val w
 val t = eval t E0
@@ -390,8 +388,8 @@ etaquote (Sg dom cod) p             = let s = vfst p in
 etaquote _            (En e) = En $ fst (netaquote e)
 
 netaquote :: Worldly w => Ne w -> (En (Syn Zero) w, Val w)
-netaquote (P x)    = (P x, refType x)
-netaquote (e :$ s) = case netaquote e of
+netaquote (P x)       = (P x, refType x)
+netaquote (e :$ s)    = case netaquote e of
   (f', Pi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
   (p', Sg dom cod) -> case s of
     Atom "Fst" -> (Fst p', dom)
@@ -399,7 +397,10 @@ netaquote (e :$ s) = case netaquote e of
 netaquote (glob :% g) = case globKind glob of
   del :=> t -> (glob :% help del g, eval (wk t) g)
   where
-    help :: Worldly w => LStar KStep Zero n -> Env Sem n w -> Env (Syn Zero) n w
+    help :: Worldly w 
+         => LStar KStep Zero n 
+         -> Env Sem n w 
+         -> Env (Syn Zero) n w
     help L0 E0 = E0
     help (del :<: KS s) (ES gamma v) =
       ES (help del gamma) (etaquote (eval (wk s) gamma) v)
