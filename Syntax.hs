@@ -32,10 +32,10 @@ module Syntax(
   Ne(..),
   ($$),
   pattern Pi,pattern Sg,pattern Set,pattern Fst, pattern Snd,
-  vfst,
-  vsnd,
+--  vfst,
+--  vsnd,
   ($/),
-  etaquote,
+--  etaquote,
   Weakenable,
   type (<=),
   VarOperable(..),
@@ -48,16 +48,22 @@ import Unsafe.Coerce
 import Data.Proxy
 import Data.Maybe
 
-type TERM = Tm (Syn Zero)
-type ELIM = En (Syn Zero)
-
 -- contexts of free variables
 data World = W0 | Bind World
 
--- syntax indexed by contexts of bound and free variables
-
 data Phase = Syn Nat | Sem
 
+pattern Type = Atom "Type"
+pattern El t = Atom "El" :& t 
+
+type TERM = Tm (Syn Zero)
+type ELIM = En (Syn Zero)
+type Val = Tm Sem
+type Kind = Val
+type Ne  = En Sem
+data THING w =  (::::) {valOf :: Val w, kindOf :: Kind w}
+
+-- syntax indexed by contexts of bound and free variables
 data En (p :: Phase)(w :: World) where
   -- bound variable
   V     :: Fin n -> En (Syn n) w
@@ -66,7 +72,7 @@ data En (p :: Phase)(w :: World) where
   -- application
   (:$)  :: En p w -> Tm p w -> En p w
   -- definition instance
-  (:%)  :: Global n -> Env p n w -> En p w
+  (:%)  :: Global n -> Env (Tm p) n w -> En p w
   -- type annotation
   (:::) :: Tm (Syn n) w -> Tm (Syn n) w -> En (Syn n) w
 
@@ -84,18 +90,18 @@ data Tm (p :: Phase)(w :: World) where
 e $$$ xs = foldl (:$) e xs
 
 instance Eq (En (Syn n) w) where
-  V x == V y = x == y
-  P x == P y = x == y
-  (e :$ s) == (e' :$ s') = e == e' && s == s'
-  (x :% g) == (x' :% g') = globHetEq x x' && envHetEq g g'
+  V x        == V y          = x == y
+  P x        == P y          = x == y
+  (e :$ s)   == (e' :$ s')   = e == e' && s == s'
+  (x :% g)   == (x' :% g')   = globHetEq x x' && envHetEq g g'
   (t ::: ty) == (t' ::: ty') = ty == ty' && t == t'
 
 -- deriving instance Show (En (Syn n) w)
 -- hopefully won't need this in a ghc > 8
 instance Show (En (Syn m) n) where
-  show (V i) = "V " ++ show i
-  show (P x) = "P " ++ show x
-  show (t :$ s) = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
+  show (V i)       = "V " ++ show i
+  show (P x)       = "P " ++ show x
+  show (t :$ s)    = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
   show (glob :% g) = "(:%) " ++ show (globName glob) ++ " " ++ show g
 
 deriving instance Eq (Tm (Syn n) w)
@@ -104,32 +110,29 @@ deriving instance Show (Tm (Syn n) w)
 
 infixr 4 :&
 
-type Val = Tm Sem
-type Ne  = En Sem
-
 type family Body (p :: Phase) ::  World -> * where
   Body (Syn n) = Tm (Syn (Suc n))
   Body Sem     = Scope
 
 -- a closed closure
 data Scope :: World -> * where
-  Scope :: Env Sem n w -> Tm (Syn (Suc n)) w -> Scope w
+  Scope :: Env THING n w -> Tm (Syn (Suc n)) w -> Scope w
 
 -- world indexed vectors would also do...
-data Env :: Phase -> Nat -> World -> * where
-  E0 :: Env p Zero w
-  ES :: Env p n w -> Tm p w -> Env p (Suc n) w
+data Env :: (World -> *) -> Nat -> World -> * where
+  E0 :: Env t Zero w
+  ES :: Env t n w -> t w -> Env t (Suc n) w
 
-deriving instance Show (Env (Syn m) n w)
+deriving instance Show (Env (Tm (Syn m)) n w)
 
-emap :: (Tm p w -> Tm p' w') -> Env p n w -> Env p' n w'
+emap :: (t w -> t' w') -> Env t n w -> Env t' n w'
 emap f E0 = E0
 emap f (ES g t) = ES (emap f g) (f t)
 
-instance Eq (Env (Syn m) n w) where 
+instance Eq (Env (Tm (Syn m)) n w) where 
   g == g' = envHetEq g g'
 
-envHetEq :: Env (Syn m) n w -> Env (Syn m) n' w -> Bool
+envHetEq :: Env (Tm (Syn m)) n w -> Env (Tm (Syn m)) n' w -> Bool
 envHetEq E0       E0         = True
 envHetEq (ES g t) (ES g' t') = envHetEq g g' && t == t'
 envHetEq _        _          = False
@@ -142,20 +145,20 @@ pattern Pi s t = Atom "Pi" :& s :& Lam t :& Nil
 pattern Sg s t = Atom "Sg" :& s :& Lam t :& Nil
 
 -- elimination forms
-pattern Fst p = p :$ Atom "Fst"
-pattern Snd p = p :$ Atom "Snd"
+pattern Fst = Atom "Fst"
+pattern Snd = Atom "Snd"
 
 -- framework kinds
 data KStep (m :: Nat) (n :: Nat) where
   KS :: Tm (Syn m) W0 -> KStep m (Suc m)
 
-data Kind (n :: Nat) where
-  (:=>) :: LStar KStep Zero n -> Tm (Syn n) W0 -> Kind n
+data Arity (n :: Nat) where
+  (:=>) :: LStar KStep Zero n -> Tm (Syn n) W0 -> Arity n
 
 -- global definitions
 data Global (n :: Nat) = Glob
   {  globName :: LongName
-  ,  globKind :: Kind n
+  ,  globArity :: Arity n
   ,  globDefn :: Maybe (Tm (Syn n) W0)
   }
 
@@ -293,6 +296,11 @@ class RefEmbeddable t where
 instance RefEmbeddable Ref where
   emb = id
 
+instance RefEmbeddable THING where
+  emb x = (:::: refType x) $ case refBinder x of
+    Local v -> v
+    _       -> En (P x)
+
 instance RefEmbeddable (En p) where
   emb = P
 
@@ -316,6 +324,8 @@ class Weakenable (t :: World -> *) where
   wk :: WorldLE w w' ~ True => t w -> t w'
   wk = unsafeCoerce
 
+instance Weakenable THING
+
 instance Weakenable Scope
 
 instance Weakenable (Tm p)
@@ -326,78 +336,88 @@ instance Weakenable (RefBinder)
 
 instance Weakenable Ref
 
-($/) :: Worldly w => Scope w -> Val w -> Val w
+($/) :: Worldly w => Scope w -> THING w -> Val w
 Scope g t $/ v = eval t (ES g v)
 
-($$) :: Worldly w => Val w -> Val w -> Val w
-En n     $$ v          = En (n :$ v)
-Lam s    $$ v          = s $/ v
-(v :& w) $$ Atom "Fst" = v
-(v :& w) $$ Atom "Snd" = w
+($$) :: Worldly w => THING w -> Val w -> THING w
+f $$ v = (f $: v) :::: (f $- v)
 
-vfst, vsnd :: Worldly w => Val w -> Val w
-vfst p = p $$ Atom "Fst"
-vsnd p = p $$ Atom "Snd"
+($:) :: Worldly w => THING w -> Val w -> Val w
+(En n   :::: _ ) $: v = En (n :$ v)
+(Lam s  :::: Pi dom cod ) $: v = s $/ (v :::: dom)
+((v :& w) :::: _ ) $: Fst = v
+((v :& w) :::: _ ) $: Snd = w
 
-elookup :: Fin n -> Env p n w -> Tm p w
+($-) :: Worldly w => THING w -> Val w -> Kind w
+(_ :::: Pi dom cod)   $- v   = cod $/ (v :::: dom)
+(_ :::: Sg dom cod)   $- Fst = dom
+p@(_ :::: Sg dom cod) $- Snd = cod $/ (p $$ Fst)
+
+elookup :: Fin n -> Env t n w -> t w
 elookup FZero    (ES g v) = v
 elookup (FSuc i) (ES g v) = elookup i g
 
-class Eval t  where
-  eval :: Worldly w => t (Syn n) w -> Env Sem n w -> Val w
+class Eval t v  where
+  eval :: Worldly w => t (Syn n) w -> Env THING n w -> v w
 
-instance Eval En where
+instance Eval En THING where
   eval (V x)        g = elookup x g
-  eval (P x)        g | Local v <- refBinder x = v
-                      | otherwise             = En (P x)
-  eval (t ::: ty)   g = eval t g
+  eval (P x)        g = emb x
+  eval (t ::: ty)   g = eval t g :::: eval ty g
   eval (f :$ s)     g = eval f g $$ eval s g
-  eval (glob :% g') g = case globDefn glob of
+{-  eval (glob :% g') g = case globDefn glob of
     Nothing -> En (glob :% newg')
     Just t  -> eval (wk t) newg'
     where
     newg' = emap (\ t -> eval t g) g'
-  
-instance Eval Tm where
+  -}
+
+instance Eval Tm Val where
   eval (Let e t) g = eval t (ES g (eval e g))
-  eval (En e)    g = eval e g
+  eval (En e)    g = valOf $ eval e g
   eval (Atom s)  g = Atom s
   eval (t :& u)  g = eval t g :& eval u g  
   eval (Lam t)   g = Lam (Scope g t)
   
-val :: Worldly w => Eval t => t (Syn Zero) w -> Val w
+val :: Worldly w => Eval t v => t (Syn Zero) w -> v w
 val t = eval t E0
 
-etaquote :: Worldly w => Val w -> Val w -> Tm (Syn Zero) w
-etaquote Set          Set          = Set
-etaquote Set          (Pi dom cod) =
-  Pi (etaquote Set dom) $ (Decl,dom) !- \ x -> etaquote Set (wk cod $/ x)
-etaquote Set          (Sg dom cod) =
-  Sg (etaquote Set dom) $ (Decl,dom) !- \ x -> etaquote Set (wk cod $/ x)
-etaquote (Pi dom cod) f             = 
-  Lam $ (Decl,dom) !- \ x -> etaquote (wk cod $/ x) (wk f $$ x)
-etaquote (Sg dom cod) p             = let s = vfst p in
-  etaquote dom s :& etaquote (cod $/ s) (vsnd p)
-etaquote _            (En e) = En $ fst (netaquote e)
+etaquote :: Worldly w => THING w -> Tm (Syn Zero) w
+etaquote (Set :::: Set) = Set
+etaquote (Pi dom cod :::: Set) =
+  Pi (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
+    etaquote ((wk cod $/ x) :::: Set)
+etaquote (Sg dom cod :::: Set) =
+  Sg (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
+    etaquote ((wk cod $/ x) :::: Set)
+etaquote f@(_ :::: Pi dom cod) = 
+  Lam $ (Decl,dom) !- \ x -> 
+      etaquote (wk f $$ x)
+etaquote p@(_ :::: Sg dom cod) = 
+  etaquote (p $$ Fst) :& etaquote (p $$ Snd)
+etaquote (En e :::: _) = En $ fst (netaquote e)
 
 netaquote :: Worldly w => Ne w -> (En (Syn Zero) w, Val w)
 netaquote (P x)       = (P x, refType x)
 netaquote (e :$ s)    = case netaquote e of
-  (f', Pi dom cod) -> (f' :$ etaquote dom s, cod $/ s)
+  (f', Pi dom cod) -> (f' :$ etaquote (s :::: dom), cod $/ (s :::: dom))
   (p', Sg dom cod) -> case s of
-    Atom "Fst" -> (Fst p', dom)
-    Atom "Snd" -> (Snd p', cod $/ En (Fst e))
-netaquote (glob :% g) = case globKind glob of
+    Atom "Fst" -> (p' :$ Fst, dom)
+    Atom "Snd" -> (p' :$ Snd, cod $/ ((En e :::: Sg dom cod) $$ Fst))
+{-
+netaquote (glob :% g) = case globArity glob of
   del :=> t -> (glob :% help del g, eval (wk t) g)
   where
     help :: Worldly w 
          => LStar KStep Zero n 
-         -> Env Sem n w 
-         -> Env (Syn Zero) n w
+         -> Env Val n w 
+         -> Env TERM n w
     help L0 E0 = E0
     help (del :<: KS s) (ES gamma v) =
       ES (help del gamma) (etaquote (eval (wk s) gamma) v)
-   
+-}
+-- We deliberately don't have a syntactic/structural equality for Ne.
+-- Also we don't have an Eq instance at all for Val as it is type directed.
+
 instance Worldly w => Eq (Ne w) where
   n == n' = fst (netaquote n) == fst (netaquote n')
-
