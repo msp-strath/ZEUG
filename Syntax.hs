@@ -150,7 +150,7 @@ pattern Snd = Atom "Snd"
 
 -- framework kinds
 data KStep (m :: Nat) (n :: Nat) where
-  KS :: Tm (Syn m) W0 -> KStep m (Suc m)
+   KS :: Tm (Syn m) W0 -> KStep m (Suc m)
 
 data Arity (n :: Nat) where
   (:=>) :: LStar KStep Zero n -> Tm (Syn n) W0 -> Arity n
@@ -365,13 +365,20 @@ instance Eval En THING where
   eval (P x)        g = emb x
   eval (t ::: ty)   g = eval t g :::: eval ty g
   eval (f :$ s)     g = eval f g $$ eval s g
-{-  eval (glob :% g') g = case globDefn glob of
-    Nothing -> En (glob :% newg')
-    Just t  -> eval (wk t) newg'
+  eval (glob :% g') g = case globDefn glob of
+    Nothing -> En (glob :% newg') :::: ty
+    Just t  -> eval (wk t) undefined :::: ty
     where
+    tele :=> tybody = globArity glob
+    ty = eval (wk tybody) undefined
+    -- this gives an environment of value, but we an environment of
+    -- things to use as the environment for evaluation
     newg' = emap (\ t -> eval t g) g'
-  -}
-
+{-
+    helper :: LStar KStep n m -> Env (Tm (Syn x)) n w -> Env THING m w -> Env THING o w
+    helper L0 E0 beta = beta
+    helper (delta :<: KS ty) (ES gamma t) beta = helper delta gamma (ES beta (eval (t ::: ty) beta))
+-}
 instance Eval Tm Val where
   eval (Let e t) g = eval t (ES g (eval e g))
   eval (En e)    g = valOf $ eval e g
