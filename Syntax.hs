@@ -360,25 +360,29 @@ elookup (FSuc i) (ES g v) = elookup i g
 class Eval t v  where
   eval :: Worldly w => t (Syn n) w -> Env THING n w -> v w
 
+type family   (n :: Nat) :+ (m :: Nat) :: Nat
+type instance Zero    :+ m = m
+type instance (Suc n) :+ m = Suc (n :+ m)
+
 instance Eval En THING where
   eval (V x)        g = elookup x g
   eval (P x)        g = emb x
   eval (t ::: ty)   g = eval t g :::: eval ty g
   eval (f :$ s)     g = eval f g $$ eval s g
   eval (glob :% g') g = case globDefn glob of
-    Nothing -> En (glob :% newg') :::: ty
-    Just t  -> eval (wk t) undefined :::: ty
+    Nothing -> En (glob :% emap valOf newg') :::: ty
+    Just t  -> eval (wk t) newg' :::: ty
     where
     tele :=> tybody = globArity glob
-    ty = eval (wk tybody) undefined
-    -- this gives an environment of value, but we an environment of
-    -- things to use as the environment for evaluation
-    newg' = emap (\ t -> eval t g) g'
-{-
-    helper :: LStar KStep n m -> Env (Tm (Syn x)) n w -> Env THING m w -> Env THING o w
-    helper L0 E0 beta = beta
-    helper (delta :<: KS ty) (ES gamma t) beta = helper delta gamma (ES beta (eval (t ::: ty) beta))
--}
+    ty = eval (wk tybody) newg'
+    newg' = instantiateTele tele (emap (\t -> eval t g) g')
+
+    instantiateTele :: Worldly w => 
+                    LStar KStep Zero n -> Env (Tm Sem) n w -> Env THING n w
+    instantiateTele (ks :<: KS ty) (ES g v) = 
+      let vs = instantiateTele ks g in ES vs (v :::: eval (wk ty) vs)
+    instantiateTele L0 E0 = E0
+
 instance Eval Tm Val where
   eval (Let e t) g = eval t (ES g (eval e g))
   eval (En e)    g = valOf $ eval e g
