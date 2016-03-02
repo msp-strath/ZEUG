@@ -415,18 +415,16 @@ netaquote (e :$ s)    = case netaquote e of
   (p', Sg dom cod) -> case s of
     Atom "Fst" -> (p' :$ Fst, dom)
     Atom "Snd" -> (p' :$ Snd, cod $/ ((En e :::: Sg dom cod) $$ Fst))
-{-
 netaquote (glob :% g) = case globArity glob of
-  del :=> t -> (glob :% help del g, eval (wk t) g)
+  del :=> t -> (glob :% emap etaquote (help del g), eval (wk t) (help del g))
   where
     help :: Worldly w 
          => LStar KStep Zero n 
          -> Env Val n w 
-         -> Env TERM n w
+         -> Env THING n w
     help L0 E0 = E0
     help (del :<: KS s) (ES gamma v) =
-      ES (help del gamma) (etaquote (eval (wk s) gamma) v)
--}
+      ES (help del gamma) (v :::: eval (wk s) (help del gamma))
 -- We deliberately don't have a syntactic/structural equality for Ne.
 -- Also we don't have an Eq instance at all for Val as it is type directed.
 
