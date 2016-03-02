@@ -7,6 +7,7 @@
              GeneralizedNewtypeDeriving #-}
 module TypeCheck where
 
+import Prelude hiding ((/))
 import Utils
 import Syntax
 
@@ -51,8 +52,9 @@ goodType t = isType t >>>= \ _ -> Yes (val t)
 ty         >:> Let e t  = goodElim e >>>= \ (v :&: vty) ->
   (Local v,vty) !- \ x -> wk ty >:> (t // x)
 Set        >:> t        = isType t -- won't work with hierarchy
-Pi dom cod >:> Lam t    = (Decl,dom) !- \ x -> (wk cod $/ x) >:> (t // x)
-Sg dom cod >:> (t :& u) = dom `goodTerm` t >>>= \ vt -> (cod $/ vt) >:> u
+Pi dom cod >:> Lam t    = (Decl,dom) !- \ x -> (wk cod / x) >:> (t // x)
+Sg dom cod >:> (t :& u) = 
+  dom `goodTerm` t >>>= \ vt -> (cod / (vt :::: dom)) >:> u
 want       >:> En e     = enType e >>>= \ got -> got `subType` want
 _          >:> _        = No
 
@@ -61,11 +63,11 @@ ty `goodTerm` t = ty >:> t >>>= \ _ -> Yes (val t)
 
 enType :: Worldly w => ELIM w -> TC Val w
 enType (P x)      = Yes (refType x)
-enType (e :$ s)   = goodElim e >>>= \ (v :&: ty) -> case ty of
-  Pi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod $/ vs)
+enType (e :/ s)   = goodElim e >>>= \ (v :&: ty) -> case ty of
+  Pi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod / (vs :::: dom))
   Sg dom cod -> case s of
     Atom "Fst" -> Yes dom
-    Atom "Snd" -> Yes (cod $/ v $$ Fst)
+    Atom "Snd" -> Yes (cod / ((v :::: ty) / "Fst"))
     _          -> No
   _          -> No
 enType (x :% g)   = case globArity x of
@@ -75,23 +77,23 @@ enType (t ::: ty) =
   vty >:> t   >>>= \ _ -> Yes vty 
 
 goodInstance :: Worldly w => 
-                LStar KStep Zero n -> Env TERM n w -> TC (Env Val n) w
+                LStar KStep Zero n -> Env TERM n w -> TC (Env THING n) w
 goodInstance (ks :<: KS ty) (ES g t) = 
   goodInstance ks g >>>= \ vs ->
   eval (wk ty) vs `goodTerm` t >>>= \ v ->
-  Yes (ES vs v)
+  Yes (ES vs (v :::: eval (wk ty) vs))
 goodInstance L0             E0       = Yes E0
 
 goodElim :: Worldly w => ELIM w -> TC (Val :* Val) w
-goodElim e = enType e >>>= \ vty -> Yes (val e :&: vty)
+goodElim e = enType e >>>= \ vty -> Yes (valOf (val e) :&: vty)
 
 -- subtype is just equality at the mo'
 subType :: Worldly w => Val w -> Val w -> TC Happy w
 Set          `subType` Set          = Yes Happy
 Pi dom0 cod0 `subType` Pi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
-  (Decl,dom1) !- \ x -> (wk cod0 $/ x) `subType` (wk cod1 $/ x)
+  (Decl,dom1) !- \ x -> (wk cod0 / x) `subType` (wk cod1 / x)
 Sg dom0 cod0 `subType` Sg dom1 cod1 = dom0 `subType` dom1 >>>= \ _ ->
-  (Decl,dom0) !- \ x -> (wk cod0 $/ x) `subType` (wk cod1 $/ x)
+  (Decl,dom0) !- \ x -> (wk cod0 / x) `subType` (wk cod1 / x)
 En e0        `subType` En e1        = if e0 == e1 then Yes Happy else No
 _            `subType` _            = No
 

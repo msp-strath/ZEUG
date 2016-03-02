@@ -34,14 +34,15 @@ module Syntax(
   pattern Pi,pattern Sg,pattern Set,pattern Fst, pattern Snd,
 --  vfst,
 --  vsnd,
-  ($/),
+--  ($/),
   Arity(..),
 --  etaquote,
   Weakenable,
   type (<=),
   VarOperable(..),
   VarOp(..),
-  LongName
+  LongName,
+  THING(..)
   ) where
 
 import Utils
@@ -309,8 +310,7 @@ instance RefEmbeddable (Tm p) where
 -}
 (!-) :: (Worldly w , Dischargeable f g) 
      => (RefBinder w, Val w) 
-     -> (forall w' . (Worldly w', w <= w') =>
-         Ref w' -> f w') 
+     -> (forall w' . (Worldly w', w <= w') => Ref w' -> f w') 
      -> g w
 p !- f = discharge x (f (extrRef x)) where x = extend p
 
@@ -347,19 +347,20 @@ instance Worldly w => Slash (THING w) (Ref w) (THING w) where
 instance Worldly w => Slash (En p w) [Tm p w] (En p w) where
   e / xs = foldl (:/) e xs
 
--- can't replace with (probably several) Slash instance(s)
--- due to fundep (w does not determine w')
-(//) :: (w <= w', VarOperable t) 
-     => t (Syn One) w 
-     -> En (Syn Zero) w' 
-     -> t (Syn Zero) w'
-body // x = varOp (Inst IdVO x) body
-
 instance Worldly w => Slash (Scope w) (THING w) (Val w) where
   Scope g t / v = eval t (ES g v)
 
 instance Worldly w => Slash (Scope w) (Ref w) (Val w) where
   s / x = s / refThing x
+
+-- can't replace with (probably several) Slash instance(s)
+-- due to fundep (w does not determine w')
+(//) :: (w <= w', VarOperable t) 
+     => t (Syn One) w 
+     -> Ref w' --En (Syn Zero) w' 
+     -> t (Syn Zero) w'
+body // x = varOp (Inst IdVO (P x)) body
+
 
 (/-) :: Worldly w => THING w -> Val w -> Val w
 (En n   :::: _ ) /- v = En (n :/ v)
