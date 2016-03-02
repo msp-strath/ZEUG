@@ -31,7 +31,7 @@ module Syntax(
   Val(..),
   Ne(..),
   Slash(..),
-  pattern Pi,pattern Sg,pattern Set,pattern Fst, pattern Snd,
+  pattern Kind, pattern Type,pattern El,pattern Pi,pattern Sg,pattern Fst, pattern Snd,
 --  vfst,
 --  vsnd,
 --  ($/),
@@ -42,7 +42,9 @@ module Syntax(
   VarOperable(..),
   VarOp(..),
   LongName,
-  THING(..)
+  THING(..),
+  refThing,
+  emap
   ) where
 
 import Utils
@@ -57,7 +59,8 @@ data World = W0 | Bind World
 data Phase = Syn Nat | Sem
 
 pattern N = Atom ""
-pattern Type = Atom "Type"
+pattern Kind = Atom "Kind" :& N
+pattern Type = Atom "Type" :& N
 pattern El t = Atom "El" :& t :& N
 
 type TERM = Tm (Syn Zero)

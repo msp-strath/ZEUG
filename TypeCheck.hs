@@ -30,7 +30,7 @@ No    >>>= _ = No
 instance Dischargeable f g => Dischargeable (TC f) (TC g) where
   discharge x No      = No
   discharge x (Yes f) = Yes (discharge x f)
-
+{-
 isType :: Worldly w => TERM w -> TC Happy w
 isType (Let e ty)   = goodElim e >>>= \ (v :&: vty) ->
   (Local v,vty) !- \ x -> isType (ty // x)
@@ -44,56 +44,66 @@ isType (Pi sty tty) =
 isType (Sg sty tty) = 
   goodType sty >>>= \ sty -> (Decl,sty) !- \ x -> isType (tty // x)
 isType _            = No
+-}
 
-goodType :: Worldly w => TERM w -> TC Val w
-goodType t = isType t >>>= \ _ -> Yes (val t)
+(/:>) :: Worldly w => Kind w -> TERM w -> TC Happy w
+El (Pi _S _T)              /:> s   = El _S >:> s
+El (Sg _S _T)              /:> Fst = Yes Happy
+El (Sg _S _T)              /:> Snd = Yes Happy
+_                          /:> _   = No
 
-(>:>) :: Worldly w => Val w -> TERM w -> TC Happy w
-ty         >:> Let e t  = goodElim e >>>= \ (v :&: vty) ->
-  (Local v,vty) !- \ x -> wk ty >:> (t // x)
-Set        >:> t        = isType t -- won't work with hierarchy
-Pi dom cod >:> Lam t    = (Decl,dom) !- \ x -> (wk cod / x) >:> (t // x)
-Sg dom cod >:> (t :& u) = 
-  dom `goodTerm` t >>>= \ vt -> (cod / (vt :::: dom)) >:> u
-want       >:> En e     = enType e >>>= \ got -> got `subType` want
+(/:>=) :: Worldly w => Kind w -> TERM w -> TC Val w
+k /:>= t = k /:> t >>>= \ _ -> Yes (val t) 
+
+(>:>) :: Worldly w => Kind w -> TERM w -> TC Happy w
+Kind >:> Type = Yes Happy
+Type >:> Pi dom cod = (Type >:>= dom) >>>= \ dom -> 
+  (Decl,El dom) !- \ x -> Type >:> (cod // x)
+Type >:> Sg dom cod = (Type >:>= dom) >>>= \ dom -> 
+  (Decl,El dom) !- \ x -> Type >:> (cod // x)
+Kind >:> El t = Type >:> t
+
+El (Pi dom cod) >:> Lam t = 
+  (Decl,El dom) !- \ x -> El (wk cod / x) >:> (t // x)
+El (Sg dom cod) >:> (t :& u) = 
+  (El dom >:>= t) >>>= \ t -> El (cod / (t :::: El dom)) >:> u
+want >:> En e = enType e >>>= \ got -> kindOf got `subKind` want
+
+k         >:> Let e t  = enType e >>>= \ (v :::: j) ->
+  (Local v,j) !- \ x -> wk k >:> (t // x)
 _          >:> _        = No
 
-goodTerm :: Worldly w => Val w -> TERM w -> TC Val w
-ty `goodTerm` t = ty >:> t >>>= \ _ -> Yes (val t)
+(>:>=) :: Worldly w => Kind w -> TERM w -> TC Val w
+k >:>= t = k >:> t >>>= \ _ -> Yes (val t) 
 
-enType :: Worldly w => ELIM w -> TC Val w
-enType (P x)      = Yes (refType x)
-enType (e :/ s)   = goodElim e >>>= \ (v :&: ty) -> case ty of
-  Pi dom cod -> (dom `goodTerm` s) >>>= \ vs -> Yes (cod / (vs :::: dom))
-  Sg dom cod -> case s of
-    Atom "Fst" -> Yes dom
-    Atom "Snd" -> Yes (cod / ((v :::: ty) / "Fst"))
-    _          -> No
-  _          -> No
+enType :: Worldly w => ELIM w -> TC THING w
+enType (P x)      = Yes (refThing x)
+enType (e :/ s)   = 
+  enType e >>>= \ e@(v :::: k) -> (k /:>= s) >>>= \ s -> Yes (e / s) 
+ 
 enType (x :% g)   = case globArity x of
-  ks :=> cod -> goodInstance ks g >>>= \ vs -> Yes $ eval (wk cod) vs
-enType (t ::: ty) =
-  goodType ty >>>= \ vty -> 
-  vty >:> t   >>>= \ _ -> Yes vty 
+  ks :=> cod -> goodInstance ks g >>>= \ vs -> Yes $ 
+    let k = eval (wk cod) vs in case globDefn x of
+      Nothing -> En (x :% emap valOf vs) :::: k
+      Just t  -> eval (wk t) vs :::: k
+enType (t ::: k) =
+  (Kind >:>= k) >>>= \ k -> (k >:>= t) >>>= \ t -> Yes (t :::: k)
 
 goodInstance :: Worldly w => 
                 LStar KStep Zero n -> Env TERM n w -> TC (Env THING n) w
 goodInstance (ks :<: KS ty) (ES g t) = 
   goodInstance ks g >>>= \ vs ->
-  eval (wk ty) vs `goodTerm` t >>>= \ v ->
+  (eval (wk ty) vs >:>= t) >>>= \ v ->
   Yes (ES vs (v :::: eval (wk ty) vs))
 goodInstance L0             E0       = Yes E0
 
-goodElim :: Worldly w => ELIM w -> TC (Val :* Val) w
-goodElim e = enType e >>>= \ vty -> Yes (valOf (val e) :&: vty)
-
 -- subtype is just equality at the mo'
-subType :: Worldly w => Val w -> Val w -> TC Happy w
-Set          `subType` Set          = Yes Happy
-Pi dom0 cod0 `subType` Pi dom1 cod1 = dom1 `subType` dom0 >>>= \ _ ->
-  (Decl,dom1) !- \ x -> (wk cod0 / x) `subType` (wk cod1 / x)
-Sg dom0 cod0 `subType` Sg dom1 cod1 = dom0 `subType` dom1 >>>= \ _ ->
-  (Decl,dom0) !- \ x -> (wk cod0 / x) `subType` (wk cod1 / x)
-En e0        `subType` En e1        = if e0 == e1 then Yes Happy else No
-_            `subType` _            = No
+subKind :: Worldly w => Val w -> Val w -> TC Happy w
+Type          `subKind` Type          = Yes Happy
+El (Pi dom0 cod0) `subKind` El (Pi dom1 cod1) = El dom1 `subKind` El dom0 >>>= \ _ ->
+  (Decl,El dom1) !- \ x -> El (wk cod0 / x) `subKind` El (wk cod1 / x)
+El (Sg dom0 cod0) `subKind` El (Sg dom1 cod1) = El dom0 `subKind` El dom1 >>>= \ _ ->
+  (Decl,El dom0) !- \ x -> El (wk cod0 / x) `subKind` El (wk cod1 / x)
+En e0        `subKind` En e1        = if e0 == e1 then Yes Happy else No
+_            `subKind` _            = No
 
