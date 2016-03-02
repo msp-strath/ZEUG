@@ -3,6 +3,7 @@
 
 module ProofState where
 
+import Prelude hiding ((/))
 import Utils
 import Layout
 import Raw
@@ -53,13 +54,13 @@ ambulando
     Yes (TC t :&: ty) -> ambulando ((ps,sup) :!-: PDef t ty)
   where
   help :: TC (TC TERM :* TERM) w
-  help = bake ps VNil ty >>>= \ ty -> goodType ty >>>= \ vty -> case t of
+  help = bake ps VNil ty >>>= \ ty -> (Type >:>= ty) >>>= \ vty -> case t of
     Left _ -> Yes (No :&: ty)
-    Right (_ := t) -> Yes ((bake ps VNil t >>>= \ t -> vty >:> t >>>= \ _ -> 
+    Right (_ := t) -> Yes ((bake ps VNil t >>>= \ t -> vty >:>= t >>>= \ _ -> 
       Yes t) :&: ty) 
     
 ambulando ((ps,sup) :!-: PRaw (_ := RawParam (x,_ := rs) m)) = 
-  case bake ps VNil rs >>>= \ bs -> goodType bs >>>= \ vs -> Yes (bs :&: vs) of
+  case bake ps VNil rs >>>= \ bs -> (Type >:>= bs) >>>= \ vs -> Yes (bs :&: vs) of
     Yes (bs :&: vs) -> 
       ambulando ((ps :<: Param x (extend (Decl,vs)) bs,sup) :!-: PRaw m)
     No    -> ambulando ((ps,sup) :!-: P0) 
@@ -143,7 +144,7 @@ eqNameStep y xi@(x,i) = case (x == y, i) of
    (True,  i) -> Left (x,i-1)
    (False, _) -> Left xi 
 
-bake :: PZ True v w -> Vec Naming n -> RawTm -> TC (Tm (Syn n)) w
+bake :: Worldly w => PZ True v w -> Vec Naming n -> RawTm -> TC (Tm (Syn n)) w
 bake ps ns (RawAtom x)                               = Yes (Atom x)
 bake ps ns (RawList []              Nothing)         = Yes (Atom "")
 bake ps ns (RawList []              (Just (_ := t))) = bake ps ns t
@@ -158,30 +159,31 @@ bake ps ns (RawEn (_ := hd) tl)                      =
 bake ps ns (RawComm (_ := t) _)                      = 
   bake ps ns t -- should deal with the comments...
 
-boil :: PZ True v w 
+boil :: Worldly w
+     => PZ True v w 
      -> Vec Naming n 
      -> RawHd 
      -> [Tm (Syn n) w] 
      -> TC (Tm (Syn n)) w
 boil ps ns (RawTy (_ := t) (_ := ty)) ts = 
   bake ps ns t >>>= \ t -> bake ps ns ty >>>= \ ty ->
-    Yes (En ((t ::: ty) $$$ ts))
+    Yes (En ((t ::: ty) / ts))
 boil ps ns (RawVar (x,xs)) ts = case blah x ns of
   Left x  -> resolve (x,xs) ps >>>= \ res -> case res of
-      RParam x   -> Yes (En (P x $$$ ts))
-      RGlob f tz -> case globKind f of
+      RParam x   -> Yes (En (P x / ts))
+      RGlob f tz -> case globArity f of
         (sz :=> _) -> case help sz (fmap vclosed tz <>> ts) of
           Nothing -> No
-          Just (g,ts) -> Yes (En ((f :% g) $$$ ts))
+          Just (g,ts) -> Yes (En ((f :% g) / ts))
           where
           help :: LStar KStep Zero m 
                -> [Tm (Syn n) w] 
-               -> Maybe (Env (Syn n) m w, [Tm (Syn n) w])
+               -> Maybe (Env (Tm (Syn n)) m w, [Tm (Syn n) w])
           help L0 ts = return (E0, ts)
           help (sz :<: KS _) ts = do
             (g,t:ts) <- help sz ts
             return (ES g t,ts)
-  Right i -> if null xs then Yes (En (V i $$$ ts)) else No
+  Right i -> if null xs then Yes (En (V i / ts)) else No
 
 blah :: NameStep -> Vec Naming n -> Either NameStep (Fin n)
 blah x VNil = Left x
