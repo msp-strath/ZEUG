@@ -377,12 +377,6 @@ instance Eval En THING where
     ty = eval (wk tybody) newg'
     newg' = instantiateTele tele (emap (\t -> eval t g) g')
 
-    instantiateTele :: Worldly w => 
-                    LStar KStep Zero n -> Env (Tm Sem) n w -> Env THING n w
-    instantiateTele (ks :<: KS ty) (ES g v) = 
-      let vs = instantiateTele ks g in ES vs (v :::: eval (wk ty) vs)
-    instantiateTele L0 E0 = E0
-
 instance Eval Tm Val where
   eval (Let e t) g = eval t (ES g (eval e g))
   eval (En e)    g = valOf $ eval e g
@@ -392,6 +386,14 @@ instance Eval Tm Val where
   
 val :: Worldly w => Eval t v => t (Syn Zero) w -> v w
 val t = eval t E0
+
+instantiateTele :: Worldly w 
+                => LStar KStep Zero n 
+                -> Env (Tm Sem) n w 
+                -> Env THING n w
+instantiateTele L0 E0 = E0
+instantiateTele (ks :<: KS ty) (ES g v) = 
+  let vs = instantiateTele ks g in ES vs (v :::: eval (wk ty) vs)
 
 etaquote :: Worldly w => THING w -> Tm (Syn Zero) w
 etaquote (Set :::: Set) = Set
@@ -416,15 +418,9 @@ netaquote (e :$ s)    = case netaquote e of
     Atom "Fst" -> (p' :$ Fst, dom)
     Atom "Snd" -> (p' :$ Snd, cod $/ ((En e :::: Sg dom cod) $$ Fst))
 netaquote (glob :% g) = case globArity glob of
-  del :=> t -> (glob :% emap etaquote (help del g), eval (wk t) (help del g))
-  where
-    help :: Worldly w 
-         => LStar KStep Zero n 
-         -> Env Val n w 
-         -> Env THING n w
-    help L0 E0 = E0
-    help (del :<: KS s) (ES gamma v) =
-      ES (help del gamma) (v :::: eval (wk s) (help del gamma))
+  del :=> t -> let g' = instantiateTele del g in 
+    (glob :% emap etaquote g', eval (wk t) g')
+
 -- We deliberately don't have a syntactic/structural equality for Ne.
 -- Also we don't have an Eq instance at all for Val as it is type directed.
 
