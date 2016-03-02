@@ -53,8 +53,9 @@ data World = W0 | Bind World
 
 data Phase = Syn Nat | Sem
 
+pattern N = Atom ""
 pattern Type = Atom "Type"
-pattern El t = Atom "El" :& t 
+pattern El t = Atom "El" :& t :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -358,19 +359,16 @@ instance Worldly w => Slash (Scope w) (THING w) (Val w) where
 instance Worldly w => Slash (Scope w) (Ref w) (Val w) where
   s / x = s / refThing x
 
---($$) :: Worldly w => THING w -> Val w -> THING w
---f $$ v = f / v
-
 (/-) :: Worldly w => THING w -> Val w -> Val w
-(En n   :::: _ ) $- v = En (n :/ v)
-(Lam s  :::: Pi dom cod ) /- v = s / (v :::: dom)
+(En n   :::: _ ) /- v = En (n :/ v)
+(Lam s  :::: El (Pi dom cod )) /- v = s / (v :::: El dom)
 ((v :& w) :::: _ ) /- Fst = v
 ((v :& w) :::: _ ) /- Snd = w
 
 (/:) :: Worldly w => THING w -> Val w -> Kind w
-(_ :::: Pi dom cod)   /: v   = cod / (v :::: dom)
-(_ :::: Sg dom cod)   /: Fst = dom
-p@(_ :::: Sg dom cod) /: Snd = cod / (p /- Fst :::: dom)
+(_ :::: El (Pi dom cod))   /: v   = El (cod / (v :::: El dom))
+(_ :::: El (Sg dom cod))   /: Fst = El dom
+p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
 
 instantiateTele :: Worldly w 
                 => LStar KStep Zero n 
@@ -416,25 +414,25 @@ val t = eval t E0
 
 etaquote :: forall w. Worldly w => THING w -> TERM w
 etaquote (Set :::: Set) = Set
-etaquote (Pi dom cod :::: Set) =
-  Pi (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
-    etaquote ((wk cod / x) :::: Set)
-etaquote (Sg dom cod :::: Set) =
-  Sg (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
-    etaquote ((wk cod / x) :::: Set)
-etaquote f@(_ :::: Pi dom cod) = 
+etaquote (El (Pi dom cod) :::: Set) =
+  El (Pi (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
+    etaquote ((wk cod / x) :::: Set))
+etaquote (El (Sg dom cod) :::: Set) =
+  El (Sg (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
+    etaquote ((wk cod / x) :::: Set))
+etaquote f@(_ :::: El (Pi dom cod)) = 
   Lam $ (Decl,dom) !- \ x -> etaquote (wk f / x)
-etaquote p@(_ :::: Sg dom cod) = 
+etaquote p@(_ :::: El (Sg dom cod)) = 
   etaquote (p / "Fst") :& etaquote (p / "Snd")
 etaquote (En e :::: _) = En $ fst (netaquote e)
 
 netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
 netaquote (P x)       = (P x, refType x)
 netaquote (e :/ s)    = case netaquote e of
-  (f', Pi dom cod) -> (f' :/ etaquote (s :::: dom), cod / (s :::: dom))
-  (p', Sg dom cod) -> case s of
+  (f', El (Pi dom cod)) -> (f' :/ etaquote (s :::: dom), cod / (s :::: dom))
+  (p', El (Sg dom cod)) -> case s of
     Fst -> (p' :/ Fst, dom)
-    Snd -> (p' :/ Snd, cod / ((En e :::: Sg dom cod) / "Fst"))
+    Snd -> (p' :/ Snd, cod / ((En e :::: El (Sg dom cod)) / "Fst"))
 netaquote (glob :% g) = case globArity glob of
   del :=> t -> let g' = instantiateTele del g in 
     (glob :% emap etaquote g', eval (wk t) g')
