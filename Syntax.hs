@@ -30,23 +30,23 @@ module Syntax(
   val,
   Val(..),
   Ne(..),
-  ($$),
+  Slash(..),
   pattern Pi,pattern Sg,pattern Set,pattern Fst, pattern Snd,
 --  vfst,
 --  vsnd,
-  ($/),
 --  etaquote,
   Weakenable,
   type (<=),
   VarOperable(..),
   VarOp(..),
-  LongName,
-  ($$$)
+  LongName
   ) where
+
 import Utils
 import Unsafe.Coerce
 import Data.Proxy
 import Data.Maybe
+import Prelude hiding ((/))
 
 -- contexts of free variables
 data World = W0 | Bind World
@@ -70,7 +70,7 @@ data En (p :: Phase)(w :: World) where
   -- free variable
   P     :: Ref w -> En p w
   -- application
-  (:$)  :: En p w -> Tm p w -> En p w
+  (:/)  :: En p w -> Tm p w -> En p w
   -- definition instance
   (:%)  :: Global n -> Env (Tm p) n w -> En p w
   -- type annotation
@@ -85,14 +85,10 @@ data Tm (p :: Phase)(w :: World) where
   -- elimination forms
   En   :: En p w -> Tm p w
 
--- iterated application
-($$$) :: En p w -> [Tm p w] -> En p w
-e $$$ xs = foldl (:$) e xs
-
 instance Eq (En (Syn n) w) where
   V x        == V y          = x == y
   P x        == P y          = x == y
-  (e :$ s)   == (e' :$ s')   = e == e' && s == s'
+  (e :/ s)   == (e' :/ s')   = e == e' && s == s'
   (x :% g)   == (x' :% g')   = globHetEq x x' && envHetEq g g'
   (t ::: ty) == (t' ::: ty') = ty == ty' && t == t'
 
@@ -101,7 +97,7 @@ instance Eq (En (Syn n) w) where
 instance Show (En (Syn m) n) where
   show (V i)       = "V " ++ show i
   show (P x)       = "P " ++ show x
-  show (t :$ s)    = "(:$) (" ++ show t ++ ") (" ++ show s ++ ")"
+  show (t :/ s)    = "(:/) (" ++ show t ++ ") (" ++ show s ++ ")"
   show (glob :% g) = "(:%) " ++ show (globName glob) ++ " " ++ show g
 
 deriving instance Eq (Tm (Syn n) w)
@@ -249,7 +245,7 @@ instance VarOperable En where
       maybe (Right FZero) (fmap FSuc . help f) (thicken x r)
       -- either we have found the right one, or we can run f on an
       -- old one
-  varOp f (hd :$ tl)  = varOp f hd :$ varOp f tl
+  varOp f (hd :/ tl)  = varOp f hd :/ varOp f tl
   varOp f (glob :% g) = glob :% emap (varOp f) g
 
 instance VarOperable Tm where
@@ -289,36 +285,32 @@ type family WorldLE (w :: World)(w' :: World) :: Bool where
   WorldLE w w' = OR (EQ w w') (WorldLT w w')
 
 type u <= v = WorldLE u v ~ True
-
+{-
 class RefEmbeddable t where
   emb :: Ref w -> t w
 
 instance RefEmbeddable Ref where
   emb = id
+-}
 
-instance RefEmbeddable THING where
-  emb x = (:::: refType x) $ case refBinder x of
-    Local v -> v
-    _       -> En (P x)
+refThing x = (:::: refType x) $ case refBinder x of
+  Local v -> v
+  _       -> En (P x)
 
+{-
 instance RefEmbeddable (En p) where
   emb = P
 
 instance RefEmbeddable (Tm p) where
   emb = En . emb
-
+-}
 (!-) :: (Worldly w , Dischargeable f g) 
      => (RefBinder w, Val w) 
-     -> (forall w' . (Worldly w', WorldLE w w' ~ True) =>
-           (forall r . RefEmbeddable r => r w') -> f w') 
+     -> (forall w' . (Worldly w', w <= w') =>
+         Ref w' -> f w') 
      -> g w
-p !- f = discharge x (f (emb (extrRef x))) where x = extend p
+p !- f = discharge x (f (extrRef x)) where x = extend p
 
-(//) :: (WorldLE w w' ~ True, VarOperable t) 
-     => t (Syn One) w 
-     -> En (Syn Zero) w' 
-     -> t (Syn Zero) w'
-body // x = varOp (Inst IdVO x) body
 
 class Weakenable (t :: World -> *) where
   wk :: WorldLE w w' ~ True => t w -> t w'
@@ -336,28 +328,63 @@ instance Weakenable (RefBinder)
 
 instance Weakenable Ref
 
-($/) :: Worldly w => Scope w -> THING w -> Val w
-Scope g t $/ v = eval t (ES g v)
+class Slash f a t | f -> t where
+  (/) :: f -> a -> t
+infixl 8 /, //, /:
 
-($$) :: Worldly w => THING w -> Val w -> THING w
-f $$ v = (f $: v) :::: (f $- v)
+instance Worldly w => Slash (THING w) (Val w) (THING w) where
+  f / v = (f /- v) :::: (f /: v)
 
-($:) :: Worldly w => THING w -> Val w -> Val w
-(En n   :::: _ ) $: v = En (n :$ v)
-(Lam s  :::: Pi dom cod ) $: v = s $/ (v :::: dom)
-((v :& w) :::: _ ) $: Fst = v
-((v :& w) :::: _ ) $: Snd = w
+instance Worldly w => Slash (THING w) String (THING w) where
+  f / s = f / (Atom s :: Val w)
+  
+instance Worldly w => Slash (THING w) (Ref w) (THING w) where
+  f / x = f / (En (P x) :: Val w)
 
-($-) :: Worldly w => THING w -> Val w -> Kind w
-(_ :::: Pi dom cod)   $- v   = cod $/ (v :::: dom)
-(_ :::: Sg dom cod)   $- Fst = dom
-p@(_ :::: Sg dom cod) $- Snd = cod $/ (p $$ Fst)
+instance Worldly w => Slash (En p w) [Tm p w] (En p w) where
+  e / xs = foldl (:/) e xs
+
+-- can't replace with (probably several) Slash instance(s)
+-- due to fundep (w does not determine w')
+(//) :: (w <= w', VarOperable t) 
+     => t (Syn One) w 
+     -> En (Syn Zero) w' 
+     -> t (Syn Zero) w'
+body // x = varOp (Inst IdVO x) body
+
+instance Worldly w => Slash (Scope w) (THING w) (Val w) where
+  Scope g t / v = eval t (ES g v)
+
+instance Worldly w => Slash (Scope w) (Ref w) (Val w) where
+  s / x = s / refThing x
+
+--($$) :: Worldly w => THING w -> Val w -> THING w
+--f $$ v = f / v
+
+(/-) :: Worldly w => THING w -> Val w -> Val w
+(En n   :::: _ ) $- v = En (n :/ v)
+(Lam s  :::: Pi dom cod ) /- v = s / (v :::: dom)
+((v :& w) :::: _ ) /- Fst = v
+((v :& w) :::: _ ) /- Snd = w
+
+(/:) :: Worldly w => THING w -> Val w -> Kind w
+(_ :::: Pi dom cod)   /: v   = cod / (v :::: dom)
+(_ :::: Sg dom cod)   /: Fst = dom
+p@(_ :::: Sg dom cod) /: Snd = cod / (p /- Fst :::: dom)
+
+instantiateTele :: Worldly w 
+                => LStar KStep Zero n 
+                -> Env Val n w 
+                -> Env THING n w
+instantiateTele L0 E0 = E0
+instantiateTele (ks :<: KS ty) (ES g v) = 
+  let vs = instantiateTele ks g in ES vs (v :::: eval (wk ty) vs)
 
 elookup :: Fin n -> Env t n w -> t w
 elookup FZero    (ES g v) = v
 elookup (FSuc i) (ES g v) = elookup i g
 
-class Eval t v  where
+class Eval t v | t -> v where
   eval :: Worldly w => t (Syn n) w -> Env THING n w -> v w
 
 type family   (n :: Nat) :+ (m :: Nat) :: Nat
@@ -366,9 +393,9 @@ type instance (Suc n) :+ m = Suc (n :+ m)
 
 instance Eval En THING where
   eval (V x)        g = elookup x g
-  eval (P x)        g = emb x
+  eval (P x)        g = refThing x
   eval (t ::: ty)   g = eval t g :::: eval ty g
-  eval (f :$ s)     g = eval f g $$ eval s g
+  eval (f :/ s)     g = eval f g / eval s g
   eval (glob :% g') g = case globDefn glob of
     Nothing -> En (glob :% emap valOf newg') :::: ty
     Just t  -> eval (wk t) newg' :::: ty
@@ -387,36 +414,27 @@ instance Eval Tm Val where
 val :: Worldly w => Eval t v => t (Syn Zero) w -> v w
 val t = eval t E0
 
-instantiateTele :: Worldly w 
-                => LStar KStep Zero n 
-                -> Env (Tm Sem) n w 
-                -> Env THING n w
-instantiateTele L0 E0 = E0
-instantiateTele (ks :<: KS ty) (ES g v) = 
-  let vs = instantiateTele ks g in ES vs (v :::: eval (wk ty) vs)
-
-etaquote :: Worldly w => THING w -> Tm (Syn Zero) w
+etaquote :: forall w. Worldly w => THING w -> TERM w
 etaquote (Set :::: Set) = Set
 etaquote (Pi dom cod :::: Set) =
   Pi (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
-    etaquote ((wk cod $/ x) :::: Set)
+    etaquote ((wk cod / x) :::: Set)
 etaquote (Sg dom cod :::: Set) =
   Sg (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
-    etaquote ((wk cod $/ x) :::: Set)
+    etaquote ((wk cod / x) :::: Set)
 etaquote f@(_ :::: Pi dom cod) = 
-  Lam $ (Decl,dom) !- \ x -> 
-      etaquote (wk f $$ x)
+  Lam $ (Decl,dom) !- \ x -> etaquote (wk f / x)
 etaquote p@(_ :::: Sg dom cod) = 
-  etaquote (p $$ Fst) :& etaquote (p $$ Snd)
+  etaquote (p / "Fst") :& etaquote (p / "Snd")
 etaquote (En e :::: _) = En $ fst (netaquote e)
 
-netaquote :: Worldly w => Ne w -> (En (Syn Zero) w, Val w)
+netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
 netaquote (P x)       = (P x, refType x)
-netaquote (e :$ s)    = case netaquote e of
-  (f', Pi dom cod) -> (f' :$ etaquote (s :::: dom), cod $/ (s :::: dom))
+netaquote (e :/ s)    = case netaquote e of
+  (f', Pi dom cod) -> (f' :/ etaquote (s :::: dom), cod / (s :::: dom))
   (p', Sg dom cod) -> case s of
-    Atom "Fst" -> (p' :$ Fst, dom)
-    Atom "Snd" -> (p' :$ Snd, cod $/ ((En e :::: Sg dom cod) $$ Fst))
+    Fst -> (p' :/ Fst, dom)
+    Snd -> (p' :/ Snd, cod / ((En e :::: Sg dom cod) / "Fst"))
 netaquote (glob :% g) = case globArity glob of
   del :=> t -> let g' = instantiateTele del g in 
     (glob :% emap etaquote g', eval (wk t) g')
