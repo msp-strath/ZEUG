@@ -35,6 +35,7 @@ module Syntax(
 --  vfst,
 --  vsnd,
   ($/),
+  Arity(..),
 --  etaquote,
   Weakenable,
   type (<=),
