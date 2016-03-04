@@ -30,7 +30,7 @@ module Syntax(
   val,
   Val(..),
   Ne(..),
-  Slash(..),
+  Act(..),
   pattern Kind, pattern Type,pattern El,pattern Pi,pattern Sg,pattern Fst, pattern Snd,
 --  vfst,
 --  vsnd,
@@ -142,7 +142,7 @@ envHetEq _        _          = False
 
 -- canonical things
 pattern Nil = Atom ""
-pattern Set = Atom "Set"
+-- pattern Set = Atom "Set"
 -- Pi, Sg :: Tm p w -> Body p w -> Tm p w
 pattern Pi s t = Atom "Pi" :& s :& Lam t :& Nil
 pattern Sg s t = Atom "Sg" :& s :& Lam t :& Nil
@@ -334,29 +334,42 @@ instance Weakenable (RefBinder)
 
 instance Weakenable Ref
 
-class Slash f a t | f -> t where
+class Act f a t | f -> t where
   (/) :: f -> a -> t
 infixl 8 /, //, /:
 
-instance Worldly w => Slash (THING w) (Val w) (THING w) where
+instance Worldly w => Act (THING w) (Val w) (THING w) where
   f / v = (f /- v) :::: (f /: v)
 
-instance Worldly w => Slash (THING w) String (THING w) where
+instance Worldly w => Act (THING w) String (THING w) where
   f / s = f / (Atom s :: Val w)
   
-instance Worldly w => Slash (THING w) (Ref w) (THING w) where
+instance Worldly w => Act (THING w) (Ref w) (THING w) where
   f / x = f / (En (P x) :: Val w)
 
-instance Worldly w => Slash (En p w) [Tm p w] (En p w) where
+instance Worldly w => Act (En p w) [Tm p w] (En p w) where
   e / xs = foldl (:/) e xs
 
-instance Worldly w => Slash (Scope w) (THING w) (Val w) where
+instance Worldly w => Act (Scope w) (THING w) (Val w) where
   Scope g t / v = eval t (ES g v)
 
-instance Worldly w => Slash (Scope w) (Ref w) (Val w) where
+instance Worldly w => Act (Scope w) (Ref w) (Val w) where
   s / x = s / refThing x
 
--- can't replace with (probably several) Slash instance(s)
+-- given a thing and an action on it, what kind of thing do you get back?
+(/:) :: Worldly w => THING w -> Val w -> Kind w
+(_ :::: El (Pi dom cod))   /: v   = El (cod / (v :::: El dom))
+(_ :::: El (Sg dom cod))   /: Fst = El dom
+p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
+
+-- given a thing and an action on it, what value do you get back?
+(/-) :: Worldly w => THING w -> Val w -> Val w
+(En n   :::: _ ) /- v = En (n :/ v)
+(Lam s  :::: El (Pi dom cod )) /- v = s / (v :::: El dom)
+((v :& w) :::: _ ) /- Fst = v
+((v :& w) :::: _ ) /- Snd = w
+
+-- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
 (//) :: (w <= w', VarOperable t) 
      => t (Syn One) w 
@@ -364,23 +377,12 @@ instance Worldly w => Slash (Scope w) (Ref w) (Val w) where
      -> t (Syn Zero) w'
 body // x = varOp (Inst IdVO (P x)) body
 
-
-(/-) :: Worldly w => THING w -> Val w -> Val w
-(En n   :::: _ ) /- v = En (n :/ v)
-(Lam s  :::: El (Pi dom cod )) /- v = s / (v :::: El dom)
-((v :& w) :::: _ ) /- Fst = v
-((v :& w) :::: _ ) /- Snd = w
-
-(/:) :: Worldly w => THING w -> Val w -> Kind w
-(_ :::: El (Pi dom cod))   /: v   = El (cod / (v :::: El dom))
-(_ :::: El (Sg dom cod))   /: Fst = El dom
-p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
-
+-- terms are to types as 'vectors' (Env Vals) are to telescopes
 instantiateTele :: Worldly w 
                 => LStar KStep Zero n 
                 -> Env Val n w 
                 -> Env THING n w
-instantiateTele L0 E0 = E0
+instantiateTele L0             E0       = E0
 instantiateTele (ks :<: KS ty) (ES g v) = 
   let vs = instantiateTele ks g in ES vs (v :::: eval (wk ty) vs)
 
@@ -419,15 +421,15 @@ val :: Worldly w => Eval t v => t (Syn Zero) w -> v w
 val t = eval t E0
 
 etaquote :: forall w. Worldly w => THING w -> TERM w
-etaquote (Set :::: Set) = Set
-etaquote (El (Pi dom cod) :::: Set) =
-  El (Pi (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
-    etaquote ((wk cod / x) :::: Set))
-etaquote (El (Sg dom cod) :::: Set) =
-  El (Sg (etaquote (dom :::: Set)) $ (Decl,dom) !- \ x -> 
-    etaquote ((wk cod / x) :::: Set))
+etaquote (El ty :::: Kind) = El (etaquote (ty :::: Type))
+etaquote (Pi dom cod :::: Type) =
+  Pi (etaquote (dom :::: Type)) $ (Decl,El dom) !- \ x -> 
+    etaquote ((wk cod / x) :::: Type)
+etaquote (Sg dom cod :::: Type) =
+  Sg (etaquote (dom :::: Type)) $ (Decl,El dom) !- \ x -> 
+    etaquote ((wk cod / x) :::: Type)
 etaquote f@(_ :::: El (Pi dom cod)) = 
-  Lam $ (Decl,dom) !- \ x -> etaquote (wk f / x)
+  Lam $ (Decl,El dom) !- \ x -> etaquote (wk f / x)
 etaquote p@(_ :::: El (Sg dom cod)) = 
   etaquote (p / "Fst") :& etaquote (p / "Snd")
 etaquote (En e :::: _) = En $ fst (netaquote e)
@@ -435,10 +437,11 @@ etaquote (En e :::: _) = En $ fst (netaquote e)
 netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
 netaquote (P x)       = (P x, refType x)
 netaquote (e :/ s)    = case netaquote e of
-  (f', El (Pi dom cod)) -> (f' :/ etaquote (s :::: dom), cod / (s :::: dom))
-  (p', El (Sg dom cod)) -> case s of
-    Fst -> (p' :/ Fst, dom)
-    Snd -> (p' :/ Snd, cod / ((En e :::: El (Sg dom cod)) / "Fst"))
+  (f', ty@(El (Pi dom cod))) -> 
+    (f' :/ etaquote (s :::: El dom), (En e :::: ty) /: s) 
+  (p', ty@(El (Sg dom cod))) -> case s of
+    Fst -> (p' :/ Fst, (En e :::: ty /: Fst))
+    Snd -> (p' :/ Snd, (En e :::: ty /: Snd))
 netaquote (glob :% g) = case globArity glob of
   del :=> t -> let g' = instantiateTele del g in 
     (glob :% emap etaquote g', eval (wk t) g')
