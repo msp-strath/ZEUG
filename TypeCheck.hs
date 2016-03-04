@@ -12,7 +12,7 @@ import Utils
 import Syntax
 
 -- our monad is on world-indexed sets
-newtype TC t w = TC (Maybe (t w))
+newtype TC t w = TC (Maybe (t w)) deriving Show
 
 pattern Yes t = TC (Just t)
 pattern No    = TC Nothing
@@ -30,39 +30,28 @@ No    >>>= _ = No
 instance Dischargeable f g => Dischargeable (TC f) (TC g) where
   discharge x No      = No
   discharge x (Yes f) = Yes (discharge x f)
-{-
-isType :: Worldly w => TERM w -> TC Happy w
-isType (Let e ty)   = goodElim e >>>= \ (v :&: vty) ->
-  (Local v,vty) !- \ x -> isType (ty // x)
-isType (En ety)     = enType ety >>>= \ ty ->
-  case ty of
-    Set -> Yes Happy
-    _   -> No
-isType Set          = Yes Happy
-isType (Pi sty tty) = 
-  goodType sty >>>= \ sty -> (Decl,sty) !- \ x -> isType (tty // x)
-isType (Sg sty tty) = 
-  goodType sty >>>= \ sty -> (Decl,sty) !- \ x -> isType (tty // x)
-isType _            = No
--}
 
+-- actionOk
 (/:>) :: Worldly w => Kind w -> TERM w -> TC Happy w
 El (Pi _S _T)              /:> s   = El _S >:> s
 El (Sg _S _T)              /:> Fst = Yes Happy
 El (Sg _S _T)              /:> Snd = Yes Happy
 _                          /:> _   = No
 
+-- evaluate action safely
 (/:>=) :: Worldly w => Kind w -> TERM w -> TC Val w
-k /:>= t = k /:> t >>>= \ _ -> Yes (val t) 
+k /:>= t = k /:> t >>>= \ _ -> Yes (val t)
 
+-- check a term in a trusted kind
 (>:>) :: Worldly w => Kind w -> TERM w -> TC Happy w
 Kind >:> Type = Yes Happy
+Type >:> Set = Yes Happy -- currently only used for testing
 Type >:> Pi dom cod = (Type >:>= dom) >>>= \ dom -> 
   (Decl,El dom) !- \ x -> Type >:> (cod // x)
 Type >:> Sg dom cod = (Type >:>= dom) >>>= \ dom -> 
   (Decl,El dom) !- \ x -> Type >:> (cod // x)
 Kind >:> El t = Type >:> t
-
+El Set >:> Set = Yes Happy -- currently only used for testing
 El (Pi dom cod) >:> Lam t = 
   (Decl,El dom) !- \ x -> El (wk cod / x) >:> (t // x)
 El (Sg dom cod) >:> (t :& u) = 
@@ -73,9 +62,12 @@ k         >:> Let e t  = enType e >>>= \ (v :::: j) ->
   (Local v,j) !- \ x -> wk k >:> (t // x)
 _          >:> _        = No
 
+-- evaluate a term safely
 (>:>=) :: Worldly w => Kind w -> TERM w -> TC Val w
 k >:>= t = k >:> t >>>= \ _ -> Yes (val t) 
 
+-- infer
+-- safely evaluate an elim and return a thing (evaluated elim + its kind)
 enType :: Worldly w => ELIM w -> TC THING w
 enType (P x)      = Yes (refThing x)
 enType (e :/ s)   = 
@@ -104,6 +96,8 @@ El (Pi dom0 cod0) `subKind` El (Pi dom1 cod1) = El dom1 `subKind` El dom0 >>>= \
   (Decl,El dom1) !- \ x -> El (wk cod0 / x) `subKind` El (wk cod1 / x)
 El (Sg dom0 cod0) `subKind` El (Sg dom1 cod1) = El dom0 `subKind` El dom1 >>>= \ _ ->
   (Decl,El dom0) !- \ x -> El (wk cod0 / x) `subKind` El (wk cod1 / x)
+El Set `subKind` Type   = Yes Happy  -- currently only used for testing
+El this `subKind` El that = if kEq Type this that then Yes Happy else No
 En e0        `subKind` En e1        = if e0 == e1 then Yes Happy else No
 _            `subKind` _            = No
 

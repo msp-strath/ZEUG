@@ -2,7 +2,7 @@
              MultiParamTypeClasses, FunctionalDependencies,
              TypeFamilies, PolyKinds, UndecidableInstances,
              FlexibleInstances, ScopedTypeVariables, StandaloneDeriving,
-             PatternSynonyms, TypeOperators, ConstraintKinds #-}
+             PatternSynonyms, TypeOperators, ConstraintKinds, TupleSections #-}
 module Syntax(
   World(..),
   Worldly,
@@ -31,12 +31,12 @@ module Syntax(
   Val(..),
   Ne(..),
   Act(..),
-  pattern Kind, pattern Type,pattern El,pattern Pi,pattern Sg,pattern Fst, pattern Snd,
+  pattern Kind, pattern Type,pattern El, pattern Set, pattern Pi,pattern Sg,pattern Fst, pattern Snd,
 --  vfst,
 --  vsnd,
 --  ($/),
   Arity(..),
---  etaquote,
+  etaquote,
   Weakenable,
   type (<=),
   VarOperable(..),
@@ -44,7 +44,8 @@ module Syntax(
   LongName,
   THING(..),
   refThing,
-  emap
+  emap,
+  kEq
   ) where
 
 import Utils
@@ -62,6 +63,7 @@ pattern N = Atom ""
 pattern Kind = Atom "Kind" :& N
 pattern Type = Atom "Type" :& N
 pattern El t = Atom "El" :& t :& N
+pattern Set = Atom "Set" :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -378,13 +380,13 @@ p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
 body // x = varOp (Inst IdVO (P x)) body
 
 -- terms are to types as 'vectors' (Env Vals) are to telescopes
-instantiateTele :: Worldly w 
+instantiateTel :: Worldly w 
                 => LStar KStep Zero n 
                 -> Env Val n w 
                 -> Env THING n w
-instantiateTele L0             E0       = E0
-instantiateTele (ks :<: KS ty) (ES g v) = 
-  let vs = instantiateTele ks g in ES vs (v :::: eval (wk ty) vs)
+instantiateTel L0             E0       = E0
+instantiateTel (ks :<: KS ty) (ES g v) = 
+  let vs = instantiateTel ks g in ES vs (v :::: eval (wk ty) vs)
 
 elookup :: Fin n -> Env t n w -> t w
 elookup FZero    (ES g v) = v
@@ -402,13 +404,12 @@ instance Eval En THING where
   eval (P x)        g = refThing x
   eval (t ::: ty)   g = eval t g :::: eval ty g
   eval (f :/ s)     g = eval f g / eval s g
-  eval (glob :% g') g = case globDefn glob of
-    Nothing -> En (glob :% emap valOf newg') :::: ty
-    Just t  -> eval (wk t) newg' :::: ty
+  eval (glob :% g') g = (:::: eval (wk tybody) newg') $ case globDefn glob of
+    Nothing -> En (glob :% emap valOf newg')
+    Just t  -> eval (wk t) newg'
     where
-    tele :=> tybody = globArity glob
-    ty = eval (wk tybody) newg'
-    newg' = instantiateTele tele (emap (\t -> eval t g) g')
+    tel :=> tybody = globArity glob
+    newg' = instantiateTel tel (emap (\t -> eval t g) g')
 
 instance Eval Tm Val where
   eval (Let e t) g = eval t (ES g (eval e g))
@@ -422,6 +423,7 @@ val t = eval t E0
 
 etaquote :: forall w. Worldly w => THING w -> TERM w
 etaquote (El ty :::: Kind) = El (etaquote (ty :::: Type))
+etaquote (Set :::: Type) = Set
 etaquote (Pi dom cod :::: Type) =
   Pi (etaquote (dom :::: Type)) $ (Decl,El dom) !- \ x -> 
     etaquote ((wk cod / x) :::: Type)
@@ -436,18 +438,23 @@ etaquote (En e :::: _) = En $ fst (netaquote e)
 
 netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
 netaquote (P x)       = (P x, refType x)
-netaquote (e :/ s)    = case netaquote e of
-  (f', ty@(El (Pi dom cod))) -> 
-    (f' :/ etaquote (s :::: El dom), (En e :::: ty) /: s) 
-  (p', ty@(El (Sg dom cod))) -> case s of
-    Fst -> (p' :/ Fst, (En e :::: ty /: Fst))
-    Snd -> (p' :/ Snd, (En e :::: ty /: Snd))
-netaquote (glob :% g) = case globArity glob of
-  del :=> t -> let g' = instantiateTele del g in 
-    (glob :% emap etaquote g', eval (wk t) g')
+netaquote (e :/ s)    = 
+  (, (En e :::: ty) /: s) $ case (ty, s) of
+    (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
+    (El (Sg dom cod), Fst) -> e' :/ Fst
+    (El (Sg dom cod), Snd) -> e' :/ Snd
+  where 
+  (e' , ty) = netaquote e 
+netaquote (glob :% g) = (glob :% emap etaquote g', eval (wk t) g')
+  where 
+  del :=> t = globArity glob
+  g' = instantiateTel del g
 
 -- We deliberately don't have a syntactic/structural equality for Ne.
 -- Also we don't have an Eq instance at all for Val as it is type directed.
 
 instance Worldly w => Eq (Ne w) where
   n == n' = fst (netaquote n) == fst (netaquote n')
+
+kEq :: Worldly w => Kind w -> Val w -> Val w -> Bool
+kEq k v v' = etaquote (v  :::: k) == etaquote (v' :::: k)

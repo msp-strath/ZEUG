@@ -67,7 +67,7 @@ B0        <>> ys = ys
 -- indexed unit type
 data Happy :: k -> * where
   Happy :: Happy k
-
+  deriving Show
 data (:*) (s :: k -> *) (t :: k -> *) (i :: k) = s i :&: t i
 
 -- reflexive transitive closures
