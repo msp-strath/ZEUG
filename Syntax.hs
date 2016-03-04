@@ -31,7 +31,7 @@ module Syntax(
   Val(..),
   Ne(..),
   Act(..),
-  pattern Kind, pattern Type,pattern El, pattern Set, pattern Pi,pattern Sg,pattern Fst, pattern Snd,
+  pattern Kind, pattern Type,pattern El, pattern Set, pattern Level, pattern Ze, pattern Su, pattern Pi,pattern Sg,pattern Fst, pattern Snd,
 --  vfst,
 --  vsnd,
 --  ($/),
@@ -63,7 +63,10 @@ pattern N = Atom ""
 pattern Kind = Atom "Kind" :& N
 pattern Type = Atom "Type" :& N
 pattern El t = Atom "El" :& t :& N
-pattern Set = Atom "Set" :& N
+pattern Set l = Atom "Set" :& l :& N
+pattern Level = Atom "Level" :& N
+pattern Ze = Atom "zero" :& N
+pattern Su n = Atom "suc" :& n :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -107,6 +110,7 @@ instance Show (En (Syn m) n) where
   show (V i)       = "V " ++ show i
   show (P x)       = "P " ++ show x
   show (t :/ s)    = "(:/) (" ++ show t ++ ") (" ++ show s ++ ")"
+  show (t ::: ty)  = "(:::) (" ++ show t ++ ") (" ++ show ty ++ ")"
   show (glob :% g) = "(:%) " ++ show (globName glob) ++ " " ++ show g
 
 deriving instance Eq (Tm (Syn n) w)
@@ -422,8 +426,10 @@ val :: Worldly w => Eval t v => t (Syn Zero) w -> v w
 val t = eval t E0
 
 etaquote :: forall w. Worldly w => THING w -> TERM w
+etaquote (Ze :::: Level) = Ze
+etaquote (Su l :::: Level) = Su (etaquote (l :::: Level))
 etaquote (El ty :::: Kind) = El (etaquote (ty :::: Type))
-etaquote (Set :::: Type) = Set
+etaquote (Set l :::: Type) = Set (etaquote (l :::: Level))
 etaquote (Pi dom cod :::: Type) =
   Pi (etaquote (dom :::: Type)) $ (Decl,El dom) !- \ x -> 
     etaquote ((wk cod / x) :::: Type)

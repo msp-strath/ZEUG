@@ -44,26 +44,28 @@ testReport (name,test) = case runTest test of
   No    -> putStrLn (name ++ ": FAILED:") >> print test
 
 passtests = 
- [("test-1",ISKIND (El (Pi Set Set)))
- ,("test0",CHECK (El (Pi Set Set)) (Lam (En (V FZero))))
- ,("test1",INFER ((Lam (En (V FZero)) ::: El (Pi Set Set)) :/ Set) (El Set))
- ,("test1.5",ISKIND (El (Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero))))))))
- ,("test2",CHECK (El (Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero))))))) (Lam (Lam (En (V FZero)))))
- ,("test3",INFER (Lam (Lam (En (V FZero))) ::: El (Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ Set) (El (Pi Set Set)))
- ,("test4",INFER (Lam (Lam (En (V FZero))) ::: El (Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ Set :/ Set) (El Set))
- ,("test5",CHECK (El (Sg Set Set)) (Set :& Set))
- ,("test6",INFER (((Set :& Set) ::: El (Sg Set Set)) :/ Fst) (El Set))
- ,("test7",INFER (((Set :& Set) ::: El (Sg Set Set)) :/ Snd) (El Set))
- ,("test8",CHECK (El (Sg Set (En (V FZero)))) (Set :& Set))
- ,("test9",CHECK (El (Pi (Sg Set Set) Set)) (Lam (En ((V FZero) :/ Fst))))
- ,("test0",NORM (Lam (En (V FZero)) ::: El (Pi (Sg Set Set) (Sg Set Set)))
+ [("test-1",ISKIND (El (Pi (Set Ze) (Set Ze))))
+ ,("test0",CHECK (El (Pi (Set Ze) (Set Ze))) (Lam (En (V FZero))))
+ ,("test1",INFER ((Lam (En (V FZero)) ::: El (Pi (Set (Su Ze)) (Set (Su Ze)))) :/ (Set Ze)) (El (Set (Su Ze))))
+ ,("test1.5",ISKIND (El (Pi (Set Ze) (Pi (En (V FZero)) (En (V (FSuc (FZero))))))))
+ ,("test2",CHECK (El (Pi (Set Ze) (Pi (En (V FZero)) (En (V (FSuc (FZero))))))) (Lam (Lam (En (V FZero)))))
+ ,("test3",INFER (Lam (Lam (En (V FZero))) ::: El (Pi (Set (Su Ze)) (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ (Set Ze)) (El (Pi (Set Ze) (Set Ze))))
+ ,("test4",INFER (Lam (Lam (En (V FZero))) ::: El (Pi (Set (Su (Su Ze))) (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ (Set (Su Ze)) :/ (Set Ze)) (El (Set (Su Ze))))
+ ,("test5",CHECK (El (Sg (Set (Su Ze)) (Set (Su Ze)))) ((Set Ze) :& (Set Ze)))
+ ,("test6",INFER ((((Set Ze) :& (Set Ze)) ::: El (Sg (Set (Su Ze)) (Set (Su Ze)))) :/ Fst) (El (Set (Su Ze))))
+ ,("test7",INFER ((((Set Ze) :& (Set Ze)) ::: El (Sg (Set (Su Ze)) (Set (Su Ze)))) :/ Snd) (El (Set (Su Ze))))
+ ,("test8",CHECK (El (Sg (Set (Su (Su Ze))) (En (V FZero)))) ((Set (Su Ze)) :& (Set Ze)))
+ ,("test9",CHECK (El (Pi (Sg (Set Ze) (Set Ze)) (Set Ze))) (Lam (En ((V FZero) :/ Fst))))
+ ,("test0",NORM (Lam (En (V FZero)) ::: El (Pi (Sg (Set Ze) (Set Ze)) (Sg (Set Ze) (Set Ze))))
                    (Lam (En ((:/) (V FZero) (Atom "Fst")) :& En ((:/) (V FZero) (Atom "Snd")))))
- ,("testLet",CHECK (El Set) (Let (Set ::: El Set) (En (Set ::: El (En (V FZero))))))
+ ,("testLet",CHECK (El (Set (Su Ze))) (Let ((Set (Su Ze)) ::: El (Set (Su (Su Ze)))) (En ((Set Ze) ::: El (En (V FZero))))))
  ]
 
 failtests = map (fmap FAILS)
- [("test0",NORM ((Lam (En (V FZero)) ::: El Set) :/ Set) (El Set))
- ,("testLet",CHECK Set (En ((Lam (En (Set ::: El (En (V FZero)))) ::: El (Pi Set Set)) :/ Set)))
+ [("test0",NORM ((Lam (En (V FZero)) ::: El (Set Ze)) :/ (Set Ze)) (El (Set Ze)))
+ ,("test3",INFER (Lam (Lam (En (V FZero))) ::: El (Pi (Set Ze) (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ (Set Ze)) (El (Pi (Set Ze) (Set Ze))))
+ ,("test4",INFER (Lam (Lam (En (V FZero))) ::: El (Pi (Set Ze) (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ (Set Ze) :/ (Set Ze)) (El (Set Ze)))
+ ,("testLet",CHECK (Set Ze) (En ((Lam (En ((Set Ze) ::: El (En (V FZero)))) ::: El (Pi (Set Ze) (Set Ze))) :/ (Set Ze))))
  ]
 
 rawTests = 
@@ -83,9 +85,9 @@ ftestRig s = do
   putStrLn (testRig x)
 
 main = do 
-  mapM_ testReport ({- rawTests ++ -} passtests ++ failtests)
+  mapM_ testReport (rawTests ++ passtests ++ failtests)
   -- can't do much else until we have a pretty printer
   ftestRig "tests/tests.zoig"
 
 blerk :: TC Val W0
-blerk = Kind >:>= El Set
+blerk = Kind >:>= El (Set Ze)

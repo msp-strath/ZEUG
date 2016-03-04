@@ -1,4 +1,4 @@
-{ set_id (X : ['El ['Set]]) = X : ['El ['Set]] }
+{ set_id (X : ['El ['Set ['zero]]]) = X : ['El ['Set ['zero]]] }
 { poly_id (X : ['El ['Set]])(x : ['El X]) = x : X }
 { Nat
   { Ty = ['Pi ['Set] \ X . ['Pi ['Pi X \ x . X] \ f . ['Pi X \ x . X]]] : ['Type] }
