@@ -62,14 +62,9 @@ passtests =
  ]
 
 failtests = map (fmap FAILS)
- [("test0",NORM ((Lam (En (V FZero)) ::: Set) :/ Set) Set)
- ,("testLet",CHECK Set (En ((Lam (En (Set ::: En (V FZero))) ::: Pi Set Set) :/ Set)))
+ [("test0",NORM ((Lam (En (V FZero)) ::: El Set) :/ Set) (El Set))
+ ,("testLet",CHECK Set (En ((Lam (En (Set ::: El (En (V FZero)))) ::: El (Pi Set Set)) :/ Set)))
  ]
-
-blerk2 :: TC Happy W0
-blerk2 = Type >:> Pi Set (Pi (En (V FZero)) (En (V (FSuc (FZero)))))
---  (Lam (Lam (En (V FZero)))))
--- raw tests (checks for an unambiguous parse)
 
 rawTests = 
  [("rawtest0",PARSE "")
@@ -92,3 +87,5 @@ main = do
   -- can't do much else until we have a pretty printer
   ftestRig "tests/tests.zoig"
 
+blerk :: TC Val W0
+blerk = Kind >:>= El Set

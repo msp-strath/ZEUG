@@ -3,6 +3,8 @@
 
 module ProofState where
 
+import Debug.Trace
+
 import Prelude hiding ((/))
 import Utils
 import Layout
@@ -54,13 +56,14 @@ ambulando
     Yes (TC t :&: ty) -> ambulando ((ps,sup) :!-: PDef t ty)
   where
   help :: TC (TC TERM :* TERM) w
-  help = bake ps VNil ty >>>= \ ty -> (Type >:>= ty) >>>= \ vty -> case t of
+  help = bake ps VNil ty >>>= \ ty -> (Kind >:>= ty) >>>= \ vty -> case t of
     Left _ -> Yes (No :&: ty)
     Right (_ := t) -> Yes ((bake ps VNil t >>>= \ t -> vty >:>= t >>>= \ _ -> 
       Yes t) :&: ty) 
     
 ambulando ((ps,sup) :!-: PRaw (_ := RawParam (x,_ := rs) m)) = 
-  case bake ps VNil rs >>>= \ bs -> (Type >:>= bs) >>>= \ vs -> Yes (bs :&: vs) of
+  case bake ps VNil rs >>>= 
+   \ bs -> (Kind >:>= bs) >>>= \ vs -> Yes (bs :&: vs) of
     Yes (bs :&: vs) -> 
       ambulando ((ps :<: Param x (extend (Decl,vs)) bs,sup) :!-: PRaw m)
     No    -> ambulando ((ps,sup) :!-: P0) 

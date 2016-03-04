@@ -1,18 +1,18 @@
-{ set_id (X : 'Set) = X : 'Set }
-{ poly_id (X : 'Set)(x : X) = x : X }
+{ set_id (X : ['El ['Set]]) = X : ['El ['Set]] }
+{ poly_id (X : ['El ['Set]])(x : ['El X]) = x : X }
 { Nat
-  { Type = ['Pi 'Set \ X . ['Pi ['Pi X \ x . X] \ f . ['Pi X \ x . X]]] : 'Set }
-  { zero = \ f . \ x . x : Type }
-  { suc  = \ n . \ f . \ x . f (n f x) : ['Pi Type \ x . Type] } }
-{ two = Nat.suc (Nat.suc Nat.zero) : Nat.Type }
+  { Ty = ['Pi ['Set] \ X . ['Pi ['Pi X \ x . X] \ f . ['Pi X \ x . X]]] : ['Type] }
+  { zero = \ f . \ x . x : ['El Ty] }
+  { suc  = \ n . \ f . \ x . f (n f x) : ['El ['Pi Ty \ x . Ty]] } }
+{ two = Nat.suc (Nat.suc Nat.zero) : ['El Nat.Ty] }
 { List
-  (X : 'Set)
-  { Type = ? : 'Set }
-  { nil   = ? : Type }
-  { cons  = ? : ['Pi X \ x . ['Pi Type \ xs . Type]] } }
-{ nums = List.cons Nat.Type two
-         (List.cons Nat.Type Nat.zero (List.nil Nat.Type))
-       : List.Type Nat.Type }
-{ twos = [ two | two ] : ['Sg Nat.Type \ x . Nat.Type ] }
-{ fst = twos 'Fst : Nat.Type }
-{ snd = twos 'Snd : Nat.Type }
+  (X : ['Type])
+  { Ty = ? : ['Type] }
+  { nil   = ? : ['El Ty] }
+  { cons  = ? : ['El ['Pi X \ x . ['Pi Ty \ xs . Ty]]] } }
+{ nums = List.cons Nat.Ty two
+         (List.cons Nat.Ty Nat.zero (List.nil Nat.Ty))
+       : ['El (List.Ty Nat.Ty)] }
+{ twos = [ two | two ] : ['El ['Sg Nat.Ty \ x . Nat.Ty ]] }
+{ fst = twos 'Fst : ['El Nat.Ty] }
+{ snd = twos 'Snd : ['El Nat.Ty] }
