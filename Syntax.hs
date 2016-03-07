@@ -31,10 +31,17 @@ module Syntax(
   Val(..),
   Ne(..),
   Act(..),
-  pattern Kind, pattern Type,pattern El, pattern Set, pattern Level, pattern Ze, pattern Su, pattern Pi,pattern Sg,pattern Fst, pattern Snd,
---  vfst,
---  vsnd,
---  ($/),
+  pattern Kind, 
+  pattern Type,
+  pattern El,
+  pattern Set,
+  pattern Level,
+  pattern Ze,
+  pattern Su,
+  pattern Pi,
+  pattern Sg,
+  pattern Fst,
+  pattern Snd,
   Arity(..),
   etaquote,
   Weakenable,
@@ -148,7 +155,7 @@ envHetEq _        _          = False
 
 -- canonical things
 pattern Nil = Atom ""
--- pattern Set = Atom "Set"
+
 -- Pi, Sg :: Tm p w -> Body p w -> Tm p w
 pattern Pi s t = Atom "Pi" :& s :& Lam t :& Nil
 pattern Sg s t = Atom "Sg" :& s :& Lam t :& Nil
@@ -298,31 +305,30 @@ type family WorldLE (w :: World)(w' :: World) :: Bool where
   WorldLE w w' = OR (EQ w w') (WorldLT w w')
 
 type u <= v = WorldLE u v ~ True
+
 {-
 class RefEmbeddable t where
   emb :: Ref w -> t w
 
 instance RefEmbeddable Ref where
   emb = id
--}
 
-refThing x = (:::: refType x) $ case refBinder x of
-  Local v -> v
-  _       -> En (P x)
-
-{-
 instance RefEmbeddable (En p) where
   emb = P
 
 instance RefEmbeddable (Tm p) where
   emb = En . emb
 -}
+
+refThing x = (:::: refType x) $ case refBinder x of
+  Local v -> v
+  _       -> En (P x)
+
 (!-) :: (Worldly w , Dischargeable f g) 
      => (RefBinder w, Val w) 
      -> (forall w' . (Worldly w', w <= w') => Ref w' -> f w') 
      -> g w
 p !- f = discharge x (f (extrRef x)) where x = extend p
-
 
 class Weakenable (t :: World -> *) where
   wk :: WorldLE w w' ~ True => t w -> t w'
@@ -364,16 +370,16 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 
 -- given a thing and an action on it, what kind of thing do you get back?
 (/:) :: Worldly w => THING w -> Val w -> Kind w
-(_ :::: El (Pi dom cod))   /: v   = El (cod / (v :::: El dom))
-(_ :::: El (Sg dom cod))   /: Fst = El dom
+(_   :::: El (Pi dom cod)) /: v   = El (cod / (v :::: El dom))
+(_   :::: El (Sg dom cod)) /: Fst = El dom
 p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
 
 -- given a thing and an action on it, what value do you get back?
 (/-) :: Worldly w => THING w -> Val w -> Val w
-(En n   :::: _ ) /- v = En (n :/ v)
-(Lam s  :::: El (Pi dom cod )) /- v = s / (v :::: El dom)
-((v :& w) :::: _ ) /- Fst = v
-((v :& w) :::: _ ) /- Snd = w
+(En n     :::: _               ) /- v   = En (n :/ v)
+(Lam s    :::: El (Pi dom cod )) /- v   = s / (v :::: El dom)
+((v :& w) :::: _               ) /- Fst = v
+((v :& w) :::: _               ) /- Snd = w
 
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
@@ -385,12 +391,12 @@ body // x = varOp (Inst IdVO (P x)) body
 
 -- terms are to types as 'vectors' (Env Vals) are to telescopes
 instantiateTel :: Worldly w 
-                => LStar KStep Zero n 
-                -> Env Val n w 
-                -> Env THING n w
+               => LStar KStep Zero n 
+               -> Env Val n w 
+               -> Env THING n w
 instantiateTel L0             E0       = E0
-instantiateTel (ks :<: KS ty) (ES g v) = 
-  let vs = instantiateTel ks g in ES vs (v :::: eval (wk ty) vs)
+instantiateTel (ks :<: KS ty) (ES g v) = ES vs (v :::: eval (wk ty) vs) 
+  where vs = instantiateTel ks g
 
 elookup :: Fin n -> Env t n w -> t w
 elookup FZero    (ES g v) = v
@@ -426,21 +432,19 @@ val :: Worldly w => Eval t v => t (Syn Zero) w -> v w
 val t = eval t E0
 
 etaquote :: forall w. Worldly w => THING w -> TERM w
-etaquote (Ze :::: Level) = Ze
-etaquote (Su l :::: Level) = Su (etaquote (l :::: Level))
-etaquote (El ty :::: Kind) = El (etaquote (ty :::: Type))
-etaquote (Set l :::: Type) = Set (etaquote (l :::: Level))
-etaquote (Pi dom cod :::: Type) =
-  Pi (etaquote (dom :::: Type)) $ (Decl,El dom) !- \ x -> 
-    etaquote ((wk cod / x) :::: Type)
-etaquote (Sg dom cod :::: Type) =
-  Sg (etaquote (dom :::: Type)) $ (Decl,El dom) !- \ x -> 
-    etaquote ((wk cod / x) :::: Type)
-etaquote f@(_ :::: El (Pi dom cod)) = 
-  Lam $ (Decl,El dom) !- \ x -> etaquote (wk f / x)
-etaquote p@(_ :::: El (Sg dom cod)) = 
+etaquote (El ty      :::: Kind           ) = El  (etaquote (ty :::: Type))
+etaquote (Ze         :::: Level          ) = Ze
+etaquote (Su l       :::: Level          ) = Su  (etaquote (l :::: Level))
+etaquote (Set l      :::: Type           ) = Set (etaquote (l :::: Level))
+etaquote (Pi dom cod :::: Type           ) = Pi  (etaquote (dom :::: Type)) $ 
+  (Decl,El dom) !- \ x -> etaquote ((wk cod / x) :::: Type)
+etaquote (Sg dom cod :::: Type           ) = Sg  (etaquote (dom :::: Type)) $ 
+  (Decl,El dom) !- \ x -> etaquote ((wk cod / x) :::: Type)
+etaquote f@(_        :::: El (Pi dom cod)) = Lam $ 
+  (Decl,El dom) !- \ x -> etaquote (wk f / x)
+etaquote p@(_        :::: El (Sg dom cod)) = 
   etaquote (p / "Fst") :& etaquote (p / "Snd")
-etaquote (En e :::: _) = En $ fst (netaquote e)
+etaquote (En e       :::: _              ) = En  (fst (netaquote e))
 
 netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
 netaquote (P x)       = (P x, refType x)
@@ -454,13 +458,15 @@ netaquote (e :/ s)    =
 netaquote (glob :% g) = (glob :% emap etaquote g', eval (wk t) g')
   where 
   del :=> t = globArity glob
-  g' = instantiateTel del g
+  g'        = instantiateTel del g
 
 -- We deliberately don't have a syntactic/structural equality for Ne.
 -- Also we don't have an Eq instance at all for Val as it is type directed.
 
+-- equality test on neutrals
 instance Worldly w => Eq (Ne w) where
   n == n' = fst (netaquote n) == fst (netaquote n')
 
+-- type directed equality test on values
 kEq :: Worldly w => Kind w -> Val w -> Val w -> Bool
 kEq k v v' = etaquote (v  :::: k) == etaquote (v' :::: k)
