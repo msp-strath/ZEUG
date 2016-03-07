@@ -32,7 +32,7 @@ runTest (PARSE s) =
 runTest (ISKIND ty)  = Kind >:> ty
 runTest (CHECK k t) = (Kind >:>= k) >>>= \ vty -> vty >:> t
 runTest (NORM e nf) =
-  enType e >>>= \ (v :::: vty) ->
+  infer e >>>= \ (v :::: vty) ->
     if etaquote (v :::: vty) == nf then Yes Happy else No
 runTest (FAILS test) = case runTest test of
   No -> Yes Happy

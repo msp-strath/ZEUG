@@ -1,7 +1,7 @@
 { set_id (X : ['El ['Set ['zero]]]) = X : ['El ['Set ['zero]]] }
-{ poly_id (X : ['El ['Set ['zero]])(x : ['El X]) = x : X }
+{ poly_id (X : ['El ['Set ['zero]]])(x : ['El X]) = x : X }
 { Nat
-  { Ty = ['Pi ['Set] \ X . ['Pi ['Pi X \ x . X] \ f . ['Pi X \ x . X]]] : ['Type] }
+  { Ty = ['Pi ['Set ['zero]] \ X . ['Pi ['Pi X \ x . X] \ f . ['Pi X \ x . X]]] : ['Type] }
   { zero = \ f . \ x . x : ['El Ty] }
   { suc  = \ n . \ f . \ x . f (n f x) : ['El ['Pi Ty \ x . Ty]] } }
 { two = Nat.suc (Nat.suc Nat.zero) : ['El Nat.Ty] }
