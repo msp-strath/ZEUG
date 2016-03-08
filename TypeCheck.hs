@@ -30,6 +30,10 @@ No    >>>= _ = No
   xs >>>== \ xs ->
   k (x:xs)
 
+tcBool :: Bool -> TC Happy w
+tcBool True = Yes Happy
+tcBool False = No
+
 instance Dischargeable f g => Dischargeable (TC f) (TC g) where
   discharge x No      = No
   discharge x (Yes f) = Yes (discharge x f)
@@ -39,6 +43,7 @@ instance Dischargeable f g => Dischargeable (TC f) (TC g) where
 El (Pi _S _T) /:> s   = El _S >:> s
 El (Sg _S _T) /:> Fst = Yes Happy
 El (Sg _S _T) /:> Snd = Yes Happy
+El (Path _S sig _T) /:> At p = Point sig >:> p
 _             /:> _   = No
 
 -- evaluate action safely
@@ -51,34 +56,60 @@ Kind            >:> Type       = Yes Happy
 Type            >:> Set l      = Level >:> l
 Type            >:> Pi dom cod =
   (Type >:>= dom) >>>= \ dom ->
-  (Decl,El dom) !- \ x -> Type >:> (cod // x)
+  (Decl,El dom) !- \ x -> Type >:> (cod // P x)
 Type            >:> Sg dom cod =
   (Type >:>= dom) >>>= \ dom ->
-  (Decl,El dom) !- \ x -> Type >:> (cod // x)
+  (Decl,El dom) !- \ x -> Type >:> (cod // P x)
 Kind            >:> El t = Type >:> t
 El (Set l')     >:> Set l      =
   Level >:>= l >>>= \l ->
   l' `levelGT` l
 El (Set l)      >:> Pi dom cod =
   (El (Set l) >:>= dom) >>>= \ dom ->
-  (Decl,El dom) !- \ x -> wk (El (Set l)) >:> (cod // x)
+  (Decl,El dom) !- \ x -> wk (El (Set l)) >:> (cod // P x)
 El (Set l)      >:> Sg dom cod =
   (El (Set l) >:>= dom) >>>= \ dom ->
-  (Decl,El dom) !- \ x -> wk (El (Set l)) >:> (cod // x)
+  (Decl,El dom) !- \ x -> wk (El (Set l)) >:> (cod // P x)
 El (Pi dom cod) >:> Lam t      =
-  (Decl,El dom) !- \ x -> El (wk cod / x) >:> (t // x)
+  (Decl,El dom) !- \ x -> El (wk cod / x) >:> (t // P x)
 El (Sg dom cod) >:> (t :& u)   =
   (El dom >:>= t) >>>= \ t ->
   El (cod / (t :::: El dom)) >:> u
 Kind            >:> Level      = Yes Happy
 Level           >:> Ze         = Yes Happy
 Level           >:> Su n       = Level >:> n
-want >:> En e =
+
+Kind            >:> Seg        = Yes Happy
+Seg             >:> Dash       = Yes Happy
+Seg             >:> Weld sig _T tau =
+  Seg  >:> sig >>>= \ _ ->
+  Type >:> _T  >>>= \ _ ->
+  Seg  >:> tau
+Kind            >:> Point sig  = Seg >:> sig
+Point sig       >:> Point Ze   = Yes Happy
+Point sig       >:> Point One  = Yes Happy
+Point (Weld sig _T tau) >:> Lft p = Point sig >:> p
+Point (Weld sig _T tau) >:> Rht p = Point tau >:> p
+Type            >:> Path _S sig _T =
+  Type >:> _S  >>>= \ _ ->
+  Seg  >:> sig >>>= \ _ -> 
+  Type >:> _T
+El (Path _S sig _T) >:> Lam _M =
+  (Decl,Point sig)                                       !-   \ i -> 
+  Type >:> (_M // P i)                                   >>>= \ _ ->
+  tcBool (kEq Type _S (val (_M // (Ze ::: Point Dash)))) >>>= \ _ ->
+  tcBool (kEq Type _T (val (_M // (One ::: Point Dash))))
+El (Path _S Dash _U) >:> Link _Q _M _Q' = 
+  Type                 >:>= _M  >>>= \ _M ->
+  El (Path _S Dash _M) >:>  _Q  >>>= \ _ ->
+  El (Path _M Dash _U) >:>  _Q'
+
+want            >:> En e =
   infer e >>>= \ got ->
   kindOf got `subKind` want
 k               >:> Let e t    =
   infer e >>>= \ (v :::: j) ->
-  (Local v,j) !- \ x -> wk k >:> (t // x)
+  (Local v,j) !- \ x -> wk k >:> (t // P x)
 _               >:> _          = No
 
 levelGT :: Worldly w => Val w -> Val w -> TC Happy w
@@ -94,11 +125,10 @@ k >:>= t = k >:> t >>>= \ _ -> Yes (val t)
 -- safely evaluate an elim and return a thing (evaluated elim + its kind)
 infer :: Worldly w => ELIM w -> TC THING w
 infer (P x)     = Yes (refThing x)
-infer (e :/ s)  =
-  infer e   >>>= \ e@(v :::: k) ->
+infer (e :/ s)  = 
+  infer e    >>>= \ e@(v :::: k) ->
   (k /:>= s) >>>= \ s ->
   Yes (e / s)
-
 infer (x :% g)  = case globArity x of
   ks :=> cod ->
     goodInstance ks g >>>= \ vs ->
@@ -132,6 +162,9 @@ El (Sg dom0 cod0) `subKind` El (Sg dom1 cod1) =
 El (Set _)        `subKind` Type              = Yes Happy
 El (Set l)        `subKind` El (Set l')       = levelLEQ l l'
 Level             `subKind` Level             = Yes Happy
+
+Weld sig _T tau   `subKind` Dash              = Yes Happy
+
 El this           `subKind` El that           =
   if kEq Type this that then Yes Happy else No
 En e0             `subKind` En e1             =

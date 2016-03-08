@@ -42,6 +42,16 @@ module Syntax(
   pattern Sg,
   pattern Fst,
   pattern Snd,
+  pattern Seg,
+  pattern Point,
+  pattern Lft,
+  pattern Rht,
+  pattern Dash,
+  pattern Weld,
+  pattern One,
+  pattern Path,
+  pattern Link,
+  pattern At,
   Arity(..),
   etaquote,
   Weakenable,
@@ -68,12 +78,24 @@ data Phase = Syn Nat | Sem
 
 pattern N = Atom ""
 pattern Kind = Atom "Kind" :& N
+
 pattern Type = Atom "Type" :& N
 pattern El t = Atom "El" :& t :& N
-pattern Set l = Atom "Set" :& l :& N
 pattern Level = Atom "Level" :& N
 pattern Ze = Atom "zero" :& N
 pattern Su n = Atom "suc" :& n :& N
+pattern Set l = Atom "Set" :& l :& N
+
+pattern Seg = Atom "Seg" :& N
+pattern Dash = Atom "-" :& N
+pattern Point s = Atom "Point" :& s :& N
+pattern Weld sig _T tau = Atom "Weld" :& sig :& _T :& tau :& N
+pattern Lft sig = Atom "Left" :& sig :& N
+pattern Rht sig = Atom "Right" :& sig :& N
+pattern One = Atom "one" :& N
+pattern Path _S sig _T = Atom "Path" :& _S :& sig :& _T :& N
+pattern Link _Q _M _Q' = Atom "Link" :& _Q :& _M :& _Q' :& N
+pattern At p = Atom "@" :& p :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -357,24 +379,26 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 
 -- given a thing and an action on it, what kind of thing do you get back?
 (/:) :: Worldly w => THING w -> Val w -> Kind w
-(_   :::: El (Pi dom cod)) /: v   = El (cod / (v :::: El dom))
-(_   :::: El (Sg dom cod)) /: Fst = El dom
-p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
+(_   :::: El (Pi dom cod))     /: v   = El (cod / (v :::: El dom))
+(_   :::: El (Sg dom cod))     /: Fst = El dom
+p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
+(_   :::: El (Path _S sig _T)) /: At p = Type
 
 -- given a thing and an action on it, what value do you get back?
 (/-) :: Worldly w => THING w -> Val w -> Val w
-(En n     :::: _               ) /- v   = En (n :/ v)
-(Lam s    :::: El (Pi dom cod )) /- v   = s / (v :::: El dom)
-((v :& w) :::: _               ) /- Fst = v
-((v :& w) :::: _               ) /- Snd = w
+(En n     :::: _               )    /- v   = En (n :/ v)
+(Lam s    :::: El (Pi dom cod ))    /- v   = s / (v :::: El dom)
+((v :& w) :::: _               )    /- Fst = v
+((v :& w) :::: _               )    /- Snd = w
+(_        :::: El (Path _S sig _T)) /- At p = undefined
 
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
 (//) :: (w <= w', VarOperable t)
      => t (Syn One) w
-     -> Ref w' --En (Syn Zero) w'
+     -> En (Syn Zero) w'
      -> t (Syn Zero) w'
-body // x = varOp (Inst IdVO (P x)) body
+body // x = varOp (Inst IdVO x) body
 
 -- terms are to types as 'vectors' (Env Vals) are to telescopes
 evalInstance :: Worldly w
@@ -431,6 +455,7 @@ etaquote f@(_        :::: El (Pi dom cod)) = Lam $
   (Decl,El dom) !- \ x -> etaquote (wk f / x)
 etaquote p@(_        :::: El (Sg dom cod)) =
   etaquote (p / "Fst") :& etaquote (p / "Snd")
+
 etaquote (En e       :::: _              ) = En  (fst (netaquote e))
 
 netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
