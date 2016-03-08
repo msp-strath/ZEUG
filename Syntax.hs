@@ -62,7 +62,8 @@ module Syntax(
   THING(..),
   refThing,
   emap,
-  kEq
+  kEq,
+  Scope(..)
   ) where
 
 import Utils

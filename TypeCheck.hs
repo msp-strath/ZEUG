@@ -95,10 +95,10 @@ Type            >:> Path _S sig _T =
   Seg  >:> sig >>>= \ _ -> 
   Type >:> _T
 El (Path _S sig _T) >:> Lam _M =
-  (Decl,Point sig)                                       !-   \ i -> 
-  Type >:> (_M // P i)                                   >>>= \ _ ->
-  tcBool (kEq Type _S (val (_M // (Ze ::: Point Dash)))) >>>= \ _ ->
-  tcBool (kEq Type _T (val (_M // (One ::: Point Dash))))
+  (Decl,Point sig)                                          !-   \ i -> 
+  Type >:> (_M // P i)                                      >>>= \ _ ->
+  tcBool (kEq Type _S (Scope E0 _M / (Ze  :::: Point sig))) >>>= \ _ ->
+  tcBool (kEq Type _T (Scope E0 _M / (One :::: Point sig)))
 El (Path _S Dash _U) >:> Link _Q _M _Q' = 
   Type                 >:>= _M  >>>= \ _M ->
   El (Path _S Dash _M) >:>  _Q  >>>= \ _ ->
