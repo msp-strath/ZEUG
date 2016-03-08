@@ -163,8 +163,12 @@ El (Set _)        `subKind` Type              = Yes Happy
 El (Set l)        `subKind` El (Set l')       = levelLEQ l l'
 Level             `subKind` Level             = Yes Happy
 
-Weld sig _T tau   `subKind` Dash              = Yes Happy
-
+El (Path _S _ _T) `subKind` El (Path _S' Dash _T') =
+  tcBool (kEq Type _S _S') >>>= \ _ ->
+  tcBool (kEq Type _T _T') 
+El (Path _S (Weld sig _M tau) _T) `subKind` El (Path _S' (Weld sig' _M' tau') _T') =
+  El (Path _S sig _M) `subKind` El (Path _S' sig' _M') >>>= \ _ ->
+  El (Path _M tau _T) `subKind` El (Path _M' tau' _T')
 El this           `subKind` El that           =
   if kEq Type this that then Yes Happy else No
 En e0             `subKind` En e1             =
