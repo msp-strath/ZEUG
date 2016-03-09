@@ -97,7 +97,7 @@ pattern One = Atom "one" :& N
 pattern Path _S sig _T = Atom "Path" :& _S :& sig :& _T :& N
 pattern Link _Q _M _Q' = Atom "Link" :& _Q :& _M :& _Q' :& N
 pattern At p = Atom "@" :& p :& N
-pattern Stink _S sig _U _Q _M _Q' = Atom "Stink" :& _S :& sig :& _U :& _Q :& _M :& _Q' :& N
+pattern Stunk _S sig _U _Q _M _Q' = Atom "Stunk" :& _S :& sig :& _U :& _Q :& _M :& _Q' :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -396,23 +396,12 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (_        :::: El (Path _S sig _T)) /- At p
   | Just _X <- whereami _S sig _T p = _X
 (Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
-(Link _Q _M _Q' :::: El (Path _S sig _T)) /- At p = link p _Q _M _Q' _S sig _T
--- this must come last otherwise it would conflict with canonical points 
+(Link _Q _M _Q' :::: El (Path _S sig _T)) /- At p = (p :::: Point sig) /- Stunk _S sig _T _Q _M _Q'
+(Lft p :::: Point _) /- Stunk _S (Weld sig _M tau) _T _Q _ _Q' = (_Q  :::: El (Path _S sig _M)) /- At p
+(Rht p :::: Point _) /- Stunk _S (Weld sig _M tau) _T _Q _ _Q' = (_Q' :::: El (Path _M tau _T)) /- At p
+(Ze  :::: Point _) /- Stunk _S _ _ _ _ _ = _S
+(One :::: Point _) /- Stunk _ _ _T _ _ _ = _T
 (En n     :::: _               )    /- v    = En (n :/ v)
-
-link :: Worldly w
-      => Val w -- point
-      -> Val w -- left path
-      -> Val w -- mid type
-      -> Val w -- right path
-      -> Val w -- left path end type
-      -> Val w -- Seg
-      -> Val w -- right end type
-      -> Val w
-link (Lft p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q :::: El (Path _S sig _M)) /- At p
-link (Rht p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q' :::: El (Path _M tau _T)) /- At p
--- lft/rht only valid if path is a weld
-link (En p) _Q _M _Q' _S sig _T = En (p :/ Stink _Q _M _Q' _S sig _T) -- we're stuck on a neutral p
 
 whereami :: Val w -- left end type
          -> Val w -- seg
@@ -499,8 +488,8 @@ netaquote (e :/ s)    =
     (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
     (El (Sg dom cod), Fst) -> e' :/ Fst
     (El (Sg dom cod), Snd) -> e' :/ Snd
-    (Point _,Stink _Q _M _Q' _S sig _T) ->
-      e' :/ Stink (etaquote (_Q :::: El (Path _S Dash _M)))
+    (Point _,Stunk _Q _M _Q' _S sig _T) ->
+      e' :/ Stunk (etaquote (_Q :::: El (Path _S Dash _M)))
                   (etaquote (_M :::: Type))
                   (etaquote (_Q' :::: El (Path _M Dash _T)))
                   (etaquote (_S :::: Type))
