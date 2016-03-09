@@ -97,6 +97,7 @@ pattern One = Atom "one" :& N
 pattern Path _S sig _T = Atom "Path" :& _S :& sig :& _T :& N
 pattern Link _Q _M _Q' = Atom "Link" :& _Q :& _M :& _Q' :& N
 pattern At p = Atom "@" :& p :& N
+pattern Stink _S sig _U _Q _M _Q' = Atom "Stink" :& _S :& sig :& _U :& _Q :& _M :& _Q' :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -387,11 +388,44 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 
 -- given a thing and an action on it, what value do you get back?
 (/-) :: Worldly w => THING w -> Val w -> Val w
-(En n     :::: _               )    /- v   = En (n :/ v)
-(Lam s    :::: El (Pi dom cod ))    /- v   = s / (v :::: El dom)
-((v :& w) :::: _               )    /- Fst = v
-((v :& w) :::: _               )    /- Snd = w
-(_        :::: El (Path _S sig _T)) /- At p = undefined
+(Lam s    :::: El (Pi dom cod ))    /- v    = s / (v :::: El dom)
+((v :& w) :::: _               )    /- Fst  = v
+((v :& w) :::: _               )    /- Snd  = w
+
+-- we prioritise canonical points, then lambda, then lft/rht projections from links over welds
+(_        :::: El (Path _S sig _T)) /- At p
+  | Just _X <- whereami _S sig _T p = _X
+(Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
+(Link _Q _M _Q' :::: El (Path _S sig _T)) /- At p = link p _Q _M _Q' _S sig _T
+-- this must come last otherwise it would conflict with canonical points 
+(En n     :::: _               )    /- v    = En (n :/ v)
+
+link :: Worldly w
+      => Val w -- point
+      -> Val w -- left path
+      -> Val w -- mid type
+      -> Val w -- right path
+      -> Val w -- left path end type
+      -> Val w -- Seg
+      -> Val w -- right end type
+      -> Val w
+      
+link (Lft p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q :::: El (Path _S sig _M)) /- At p
+link (Rht p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q :::: El (Path _M tau _T)) /- At p
+-- lft/rht only valid if path is a weld
+link (En p) _Q _M _Q' _S sig _T = En (p :/ Stink _Q _M _Q' _S sig _T) -- we're stuck on a neutral p
+
+whereami :: Val w -- left end type
+         -> Val w -- seg
+         -> Val w -- right end type
+         -> Val w -- point
+         -> Maybe (Val w)
+whereami _S sig               _T Ze      = Just _S
+whereami _S sig               _T One     = Just _T
+whereami _S (Weld sig _M tau) _T (Lft p) = whereami _S sig _M p
+whereami _S (Weld sig _M tau) _T (Rht p) = whereami _S tau _M p
+whereami _  _                 _  (En p)  = Nothing
+
 
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
