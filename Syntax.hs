@@ -409,7 +409,6 @@ link :: Worldly w
       -> Val w -- Seg
       -> Val w -- right end type
       -> Val w
-      
 link (Lft p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q :::: El (Path _S sig _M)) /- At p
 link (Rht p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q :::: El (Path _M tau _T)) /- At p
 -- lft/rht only valid if path is a weld
@@ -500,6 +499,14 @@ netaquote (e :/ s)    =
     (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
     (El (Sg dom cod), Fst) -> e' :/ Fst
     (El (Sg dom cod), Snd) -> e' :/ Snd
+    (Point _,Stink _Q _M _Q' _S sig _T) ->
+      e' :/ Stink (etaquote (_Q :::: El (Path _S Dash _M)))
+                  (etaquote (_M :::: Type))
+                  (etaquote (_Q' :::: El (Path _M Dash _T)))
+                  (etaquote (_S :::: Type))
+                  (etaquote (sig :::: Seg))
+                  (etaquote (_T :::: Type)) 
+    (El (Path _S seg _T), At p) -> e' :/ At (etaquote (p :::: Point seg))
   where
   (e' , ty) = netaquote e
 netaquote (glob :% g) = (glob :% emap etaquote g', eval (wk t) g')
