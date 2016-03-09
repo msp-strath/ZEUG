@@ -501,7 +501,7 @@ netaquote (e :/ s)    =
     (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
     (El (Sg dom cod), Fst) -> e' :/ Fst
     (El (Sg dom cod), Snd) -> e' :/ Snd
-    (Point _,Stunk _S Dash _T _Q _M _Q') -> 
+    (Point _,Stunk _S Dash _T _Q _M _Q') -> undefined
     (Point _,Stunk _S (Weld sig _M tau) _T _Q _ _Q') ->
       e' :/ Stunk (etaquote (_S :::: Type))
                   (etaquote (sig :::: Seg))
