@@ -63,7 +63,13 @@ module Syntax(
   refThing,
   emap,
   kEq,
-  Scope(..)
+  Scope(..),
+  TC(..),
+  pattern Yes,
+  pattern No,
+  (>>>=),
+  (>>>==),
+  tcBool
   ) where
 
 import Utils
@@ -494,6 +500,34 @@ etaquote _Q@(_ :::: Path _S seg _T) = Lam $
 
 etaquote (En e       :::: _              ) = En  (fst (netaquote e))
 
+-- our monad is on world-indexed sets
+newtype TC t w = TC (Maybe (t w)) deriving Show
+
+pattern Yes t = TC (Just t)
+pattern No    = TC Nothing
+
+instance Weakenable t => Weakenable (TC t)
+
+(>>>=) :: TC s w -> (s w -> TC t w) -> TC t w
+Yes s >>>= f = f s
+No    >>>= _ = No
+
+(>>>==) :: [TC s w] -> ([s w] -> TC t w) -> TC t w
+[]     >>>== k = k []
+(x:xs) >>>== k =
+  x  >>>=  \ x ->
+  xs >>>== \ xs ->
+  k (x:xs)
+
+tcBool :: Bool -> TC Happy w
+tcBool True = Yes Happy
+tcBool False = No
+
+instance Dischargeable f g => Dischargeable (TC f) (TC g) where
+  discharge x No      = No
+  discharge x (Yes f) = Yes (discharge x f)
+
+
 netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
 netaquote (P x)       = (P x, refType x)
 netaquote (e :/ s)    =
@@ -501,7 +535,18 @@ netaquote (e :/ s)    =
     (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
     (El (Sg dom cod), Fst) -> e' :/ Fst
     (El (Sg dom cod), Snd) -> e' :/ Snd
-    (Point _,Stunk _S Dash _T _Q _M _Q') -> undefined
+{-
+    (Point _,Stunk _S Dash _T _Q _M _Q') -> 
+      let t1 = (Decl,Point Dash) !- (\ i -> tcBool $ 
+                 kEq Type (wk _S) (wk (_Q :::: El (Path _S Dash _M)) /- At (En (P i))))
+          t2 = (Decl,Point Dash) !- (\ i -> tcBool $ 
+                 kEq Type (wk (_Q' :::: El (Path _M Dash _T)) /- At (En (P i))) (wk _T))
+      in case (t1,t2) of
+        (No       ,No       ) -> undefined
+        (No       ,Yes Happy) -> undefined
+        (Yes Happy,No       ) -> undefined
+        (Yes Happy,Yes Happy) -> undefined
+-}
     (Point _,Stunk _S (Weld sig _M tau) _T _Q _ _Q') ->
       e' :/ Stunk (etaquote (_S :::: Type))
                   (etaquote (sig :::: Seg))
