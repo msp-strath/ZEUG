@@ -410,7 +410,7 @@ link :: Worldly w
       -> Val w -- right end type
       -> Val w
 link (Lft p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q :::: El (Path _S sig _M)) /- At p
-link (Rht p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q :::: El (Path _M tau _T)) /- At p
+link (Rht p) _Q _ _Q' _S (Weld sig _M tau) _T = (_Q' :::: El (Path _M tau _T)) /- At p
 -- lft/rht only valid if path is a weld
 link (En p) _Q _M _Q' _S sig _T = En (p :/ Stink _Q _M _Q' _S sig _T) -- we're stuck on a neutral p
 
