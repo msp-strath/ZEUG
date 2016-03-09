@@ -422,7 +422,7 @@ whereami :: Val w -- left end type
 whereami _S sig               _T Ze      = Just _S
 whereami _S sig               _T One     = Just _T
 whereami _S (Weld sig _M tau) _T (Lft p) = whereami _S sig _M p
-whereami _S (Weld sig _M tau) _T (Rht p) = whereami _S tau _M p
+whereami _S (Weld sig _M tau) _T (Rht p) = whereami _M tau _T p
 whereami _  _                 _  (En p)  = Nothing
 
 
