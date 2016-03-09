@@ -391,8 +391,6 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (Lam s    :::: El (Pi dom cod ))    /- v    = s / (v :::: El dom)
 ((v :& w) :::: _               )    /- Fst  = v
 ((v :& w) :::: _               )    /- Snd  = w
-
--- we prioritise canonical points, then lambda, then lft/rht projections from links over welds
 (_        :::: El (Path _S sig _T)) /- At p
   | Just _X <- whereami _S sig _T p = _X
 (Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
@@ -401,6 +399,7 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (Rht p :::: Point _) /- Stunk _S (Weld sig _M tau) _T _Q _ _Q' = (_Q' :::: El (Path _M tau _T)) /- At p
 (Ze  :::: Point _) /- Stunk _S _ _ _ _ _ = _S
 (One :::: Point _) /- Stunk _ _ _T _ _ _ = _T
+
 (En n     :::: _               )    /- v    = En (n :/ v)
 
 whereami :: Val w -- left end type
@@ -478,6 +477,20 @@ etaquote f@(_        :::: El (Pi dom cod)) = Lam $
   (Decl,El dom) !- \ x -> etaquote (wk f / x)
 etaquote p@(_        :::: El (Sg dom cod)) =
   etaquote (p / "Fst") :& etaquote (p / "Snd")
+etaquote (Ze         :::: Point seg      ) = Ze
+etaquote (One        :::: Point seg      ) = One
+etaquote (Lft p     :::: Point (Weld sig _ _)) = 
+  case etaquote (p :::: Point sig) of
+    Ze -> Ze
+    One -> Rht Ze -- if you're in the middle you're on the right :)
+    p   -> Lft p
+etaquote (Rht p    :::: Point (Weld _ _ tau)) = 
+  case etaquote (p :::: Point tau) of
+    One -> One
+    p   -> Rht p
+etaquote _Q@(_ :::: Path _S seg _T) = Lam $
+  (Decl,Point seg) !- \ (x :: Ref w') -> 
+    etaquote (wk _Q / (At (En (P x)) :: Val w'))
 
 etaquote (En e       :::: _              ) = En  (fst (netaquote e))
 
@@ -488,13 +501,15 @@ netaquote (e :/ s)    =
     (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
     (El (Sg dom cod), Fst) -> e' :/ Fst
     (El (Sg dom cod), Snd) -> e' :/ Snd
-    (Point _,Stunk _Q _M _Q' _S sig _T) ->
-      e' :/ Stunk (etaquote (_Q :::: El (Path _S Dash _M)))
-                  (etaquote (_M :::: Type))
-                  (etaquote (_Q' :::: El (Path _M Dash _T)))
-                  (etaquote (_S :::: Type))
+    (Point _,Stunk _S Dash _T _Q _M _Q') -> 
+    (Point _,Stunk _S (Weld sig _M tau) _T _Q _ _Q') ->
+      e' :/ Stunk (etaquote (_S :::: Type))
                   (etaquote (sig :::: Seg))
-                  (etaquote (_T :::: Type)) 
+                  (etaquote (_T :::: Type))
+                  (etaquote (_Q :::: El (Path _S sig _M)))
+                  (etaquote (_M :::: Type))
+                  (etaquote (_Q' :::: El (Path _M tau _T)))
+                  
     (El (Path _S seg _T), At p) -> e' :/ At (etaquote (p :::: Point seg))
   where
   (e' , ty) = netaquote e
