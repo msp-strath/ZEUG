@@ -64,12 +64,6 @@ module Syntax(
   emap,
   kEq,
   Scope(..),
-  TC(..),
-  pattern Yes,
-  pattern No,
-  (>>>=),
-  (>>>==),
-  tcBool
   ) where
 
 import Utils
@@ -419,7 +413,6 @@ whereami _S (Weld sig _M tau) _T (Lft p) = whereami _S sig _M p
 whereami _S (Weld sig _M tau) _T (Rht p) = whereami _M tau _T p
 whereami _  _                 _  (En p)  = Nothing
 
-
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
 (//) :: (w <= w', VarOperable t)
@@ -500,33 +493,11 @@ etaquote _Q@(_ :::: Path _S seg _T) = Lam $
 
 etaquote (En e       :::: _              ) = En  (fst (netaquote e))
 
--- our monad is on world-indexed sets
-newtype TC t w = TC (Maybe (t w)) deriving Show
+data Wibble w = Cheer | Fear
 
-pattern Yes t = TC (Just t)
-pattern No    = TC Nothing
-
-instance Weakenable t => Weakenable (TC t)
-
-(>>>=) :: TC s w -> (s w -> TC t w) -> TC t w
-Yes s >>>= f = f s
-No    >>>= _ = No
-
-(>>>==) :: [TC s w] -> ([s w] -> TC t w) -> TC t w
-[]     >>>== k = k []
-(x:xs) >>>== k =
-  x  >>>=  \ x ->
-  xs >>>== \ xs ->
-  k (x:xs)
-
-tcBool :: Bool -> TC Happy w
-tcBool True = Yes Happy
-tcBool False = No
-
-instance Dischargeable f g => Dischargeable (TC f) (TC g) where
-  discharge x No      = No
-  discharge x (Yes f) = Yes (discharge x f)
-
+instance Dischargeable Wibble Wibble where
+  discharge _ Cheer = Cheer
+  discharge _ Fear  = Fear
 
 netaquote :: Worldly w => Ne w -> (ELIM w, Val w)
 netaquote (P x)       = (P x, refType x)
@@ -537,22 +508,22 @@ netaquote (e :/ s)    =
     (El (Sg dom cod), Snd) -> e' :/ Snd
 {-
     (Point _,Stunk _S Dash _T _Q _M _Q') -> 
-      let t1 = (Decl,Point Dash) !- (\ i -> tcBool $ 
-                 kEq Type (wk _S) (wk (_Q :::: El (Path _S Dash _M)) /- At (En (P i))))
-          t2 = (Decl,Point Dash) !- (\ i -> tcBool $ 
-                 kEq Type (wk (_Q' :::: El (Path _M Dash _T)) /- At (En (P i))) (wk _T))
+      let t1 = (Decl,Point Dash) !- (\ i -> 
+                 if kEq Type (wk _S) (wk (_Q :::: El (Path _S Dash _M)) /- At (En (P i))) then Cheer else Fear)
+          t2 = (Decl,Point Dash) !- (\ i -> 
+                 if kEq Type (wk (_Q' :::: El (Path _M Dash _T)) /- At (En (P i))) (wk _T) then Cheer else Fear)
       in case (t1,t2) of
-        (No       ,No       ) -> undefined
-        (No       ,Yes Happy) -> undefined
-        (Yes Happy,No       ) -> undefined
-        (Yes Happy,Yes Happy) -> undefined
+        (Fear  ,Fear ) -> 
+        (Fear  ,Cheer) -> e' :/ 
+        (Cheer ,Fear ) -> e'
+        (Cheer ,Cheer) -> e'
 -}
     (Point _,Stunk _S (Weld sig _M tau) _T _Q _ _Q') ->
-      e' :/ Stunk (etaquote (_S :::: Type))
+      e' :/ Stunk (etaquote (_S  :::: Type))
                   (etaquote (sig :::: Seg))
-                  (etaquote (_T :::: Type))
-                  (etaquote (_Q :::: El (Path _S sig _M)))
-                  (etaquote (_M :::: Type))
+                  (etaquote (_T  :::: Type))
+                  (etaquote (_Q  :::: El (Path _S sig _M)))
+                  (etaquote (_M  :::: Type))
                   (etaquote (_Q' :::: El (Path _M tau _T)))
                   
     (El (Path _S seg _T), At p) -> e' :/ At (etaquote (p :::: Point seg))

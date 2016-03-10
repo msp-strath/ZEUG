@@ -11,6 +11,33 @@ import Prelude hiding ((/))
 import Utils
 import Syntax
 
+-- our monad is on world-indexed sets
+newtype TC t w = TC (Maybe (t w)) deriving Show
+
+pattern Yes t = TC (Just t)
+pattern No    = TC Nothing
+
+instance Weakenable t => Weakenable (TC t)
+
+(>>>=) :: TC s w -> (s w -> TC t w) -> TC t w
+Yes s >>>= f = f s
+No    >>>= _ = No
+
+(>>>==) :: [TC s w] -> ([s w] -> TC t w) -> TC t w
+[]     >>>== k = k []
+(x:xs) >>>== k =
+  x  >>>=  \ x ->
+  xs >>>== \ xs ->
+  k (x:xs)
+
+tcBool :: Bool -> TC Happy w
+tcBool True = Yes Happy
+tcBool False = No
+
+instance Dischargeable f g => Dischargeable (TC f) (TC g) where
+  discharge x No      = No
+  discharge x (Yes f) = Yes (discharge x f)
+
 
 -- actionOk
 (/:>) :: Worldly w => Kind w -> TERM w -> TC Happy w
