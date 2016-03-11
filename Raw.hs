@@ -57,13 +57,13 @@ data RawHd
 
 tag :: ParseTokens String
 tag = sym >>= \ x -> case x of
-  '\'' : s  -> return s
-  _         -> empty
+  '\'' : s -> return s
+  _        -> empty
 
 var :: ParseTokens String
 var = sym >>= \ x -> case x of
   c : s | elem c "'\\-" -> empty
-  _ | elem ':' x -> empty
+  _     | elem ':' x -> empty
   _ -> return x
 
 bigMod :: ParseTokens RawModule
@@ -161,9 +161,3 @@ rawTreeFormat = Format (:&&:) (gap *> bigTm <* gap) rawTreeFormat
 
 rawTest :: String -> [[RawTree]]
 rawTest = document rawTreeFormat . layout
-
--- parses nonsense (headline (layout "blah ( bler        )       berr"))
--- parses bigMod (headline (layout ""))
--- parses bigMod (headline (layout "(x : S)"))
--- parses bigMod (headline (layout "(x : S){x}"))
--- parses bigMod (headline (layout "(x : S){x = hello : world}"))
