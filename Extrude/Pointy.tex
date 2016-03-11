@@ -188,7 +188,17 @@ It computes as follows.
 \end{array}\]
 Note that a neutral point is either a point variable or its opposite.
 
-Segmentations are ordered by \emph{subtlety}, which induces subkinding.
+For any given segmentation $\sigma$, we can compute the finite set
+of canonical points it contains.
+\[\begin{array}{l}
+\textrm{Point}(\sigma) = \{\PL\}\cup\textrm{Inner}(\sigma)\cup\{\PR\}\\
+\textrm{Inner}(\da) = \{\} \\
+\textrm{Inner}(\sigma T\tau) = \{\PL p|p\in\textrm{Inner}(\sigma)\}\cup\{\SR\PL\}\cup
+  \{\PR p|p\in\textrm{Inner}(\tau)\}
+\end{array}\]
+
+Segmentations are ordered by \emph{subtlety}, which induces
+inclusion of canonical point sets, and thence subkinding.
 \[
 \Axiom{\da\le\sigma}
 \qquad
@@ -209,24 +219,21 @@ A type path type is given as a segmentation between two types.
 \Rule{\TYPE\ni S\quad \SE\ni\sigma\quad\TYPE\ni T}
      {\TYPE\ni S\sigma T}
 \]
+A type path type with segmentation $\sigma$ tells us the types at all the
+\emph{canonical} points in $\textrm{Point}(\sigma)$.
+\[\begin{array}{c}
+(S\sigma U).\PL = S\qquad
+(S\se{\sigma T\tau}U).\SL p = (S\sigma T).p\\
+(S\se{\sigma T\tau}U).\SR p = (T\tau U).p\qquad  
+(S\sigma U).\PR = U
+\end{array}\]
 A type path is an abstraction over the points in the segmentation which
-connects with the segmentation at all points.
-\newcommand{\conn}{\mathrel{\bowtie}}
+connects with the segmentation at all points: the universal quantifier
+eliminates as a finite conjunction of premises.
 \[
 \Rule{i:\PO\sigma \vdash \TYPE \ni T\sbs i \quad
-      \TYPE\ni S\equiv T\sbs\PL \quad
-      T\sbs\cdot\conn\sigma \quad
-      \TYPE\ni T\sbs\PR \equiv U }
+      \forall p\in \textrm{Point}(\sigma).\:\TYPE \ni (S\sigma U).p\equiv T\sbs{p\hb\PO\sigma} }
      {\EL{S\sigma U}\ni\LA i T}
-\]
-Connection is given as follows:
-\[
-\Axiom{T\sbs\cdot\conn\da}
-\qquad
-\Rule{T\sbs{\SL\cdot}\conn\sigma\quad
-      \TYPE\ni S\equiv T\sbs{\SR\PL}\quad
-      T\sbs{\SR\cdot}\conn\tau}
-     {T\sbs\cdot\conn\se{\sigma S\tau}}
 \]
 
 Subtlety induces subtyping contravariantly, meaning that you can forget the
@@ -239,13 +246,6 @@ The elimination behaviour is by substitution.
 \[
 (\LA i T\sbs i: \EL{S\sigma U})\:p \leadsto T\sbs{p\hb\PO\sigma}:\TYPE
 \]
-The type path type tells us the types at all its \emph{canonical} points.
-\[\begin{array}{c}
-(S\sigma U).\PL = S\qquad
-(S\se{\sigma T\tau}U).\SL p = (S\sigma T).p\\
-(S\se{\sigma T\tau}U).\SR p = (T\tau U).p\qquad  
-(S\sigma U).\PR = U
-\end{array}\]
 So, given that type reconstruction is easy for neutrals, we may have
 \[
 Q\in\EL{S\sigma U}\wedge (S\sigma U).p = T \quad\Rightarrow\quad Q\:p\leadsto T\hb\TYPE
@@ -321,7 +321,7 @@ If we have $\EL{S\da T}\ni P$ and $\EL{T\da U}\ni Q$, we get their composite
 \LA i{i\:\kink(S\da T\da U|P\:Q)}
 \]
 where this composition absorbs identities (constant paths) and is associative.
-
+We write this composition as $\circ$.
 
 \section{transporting values along type paths}
 
@@ -347,18 +347,18 @@ in the sense that $\SL i$ matches $\PL$ with $i=\PL$ and $\SR\PL$ with $i=\PR$,
 and similarly on the right.
 \[\begin{array}{c}
 \xport Q{\SL i}{\SL j}u \leadsto
-  \xport{\LA k{Q\:(\SL k)}}iju
+  \xport{Q\SL}iju
 \\
 \xport Q{\SR i}{\SR j}u \leadsto
-  \xport{\LA k{Q\:(\SR k)}}iju
+  \xport{Q\SR}iju
 \end{array}\]
 If we get a thing on each side, we go via the middle.
 \[\begin{array}{c}
 \xport Q{\SL i}{\SR j}u \leadsto
-  \xport Q{\SR\PL}{\SR j}{\xport Q{\SL i}{\SL \PR}u}
+  \xport{Q\SR}\PL j{\xport{Q\SL}i\PR u}
 \\
 \xport Q{\SR i}{\SL j}u \leadsto
-  \xport Q{\SL\PR}{\SL j}{\xport Q{\SR i}{\SR \PL}u}
+  \xport{Q\SL}\PR j{\xport{Q\SR}i\PL u}
 \end{array}\]
 
 If $i$ and $j$ are distinct but neutral, it's ok to be stuck.
@@ -373,6 +373,12 @@ Kinky paths transport in stages, e.g.:
   \xport Q\PL\PR{\xport P\PL\PR s}
 \]
 (What if the head isn't $k$? It's ok to be stuck, I think, because $s$ can't be canonical.)
+Now, the fact that $\kink$ squishes constant paths means that transportation must also
+do so.
+\[
+\xport{\LA \_ T}iju \leadsto u
+\]
+In particular, we have now established functoriality of transportation.
 
 When we have handy $\eta$-laws and structural paths, we can be quite aggressive and
 still resolve critical pairs.
@@ -406,7 +412,7 @@ segments separately, then kink them back together.
 \xport{\LA k{S\sbs k\se{\sigma\sbs k T\sbs k\tau\sbs k}U\sbs k}}\PL\PR Q \leadsto
   \LA i{}\\
   \quad
-  i\:\kink(S\sbs k \sigma\sbs k T\sbs k\tau\sbs kU\sbs k|\\
+  i\:\kink(S\sbs\PR \sigma\sbs\PR T\sbs\PR \tau\sbs\PR U\sbs\PR|\\
   \qquad    (\xport{\LA k{S\sbs k \sigma\sbs k T\sbs k}}\PL\PR{Q\SL}) \\
   \qquad    (\xport{\LA k{T\sbs k \tau\sbs k   U\sbs k}}\PL\PR{Q\SR}))
 \end{array}\]
