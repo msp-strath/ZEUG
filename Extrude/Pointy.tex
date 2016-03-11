@@ -1,0 +1,415 @@
+\documentclass{article}
+%%\usepackage{fourier} %% \widearc
+\usepackage{wasysym}
+\usepackage{amssymb}
+%\usepackage{amsmath}
+%\usepackage{mathabx} %% \overgroup \wideparen
+\usepackage{upgreek}
+\usepackage{pig}
+
+\ColourEpigram
+
+\begin{document}
+\title{Subtle Points}
+\author{James, Fred and Conor, probably}
+\maketitle
+
+\newcommand{\hb}{\!:\!}
+\newcommand{\sbs}[1]{[ #1 ]}
+\newcommand{\PI}[3]{\blue{(}#1\hb#2\blue{)} \mathrel{\blue{\to}} #3}
+\newcommand{\LA}[2]{\red{\uplambda}\,#1 \mathrel{\red{\to}} #2}
+\newcommand{\SG}[3]{\blue{(}#1\hb#2\blue{)} \mathrel{\blue{\times}} #3}
+\newcommand{\pr}{\red{,}\,}
+\newcommand{\car}{\:\green{\textsf{car}}}
+\newcommand{\cdr}{\:\green{\textsf{cdr}}}
+\newcommand{\NE}{\underline}
+\newcommand{\ATOM}[1]{\black{\mathsf{#1}}}
+\newcommand{\Atom}[1]{\blue{\mathsf{#1}}}
+\newcommand{\atom}[1]{\red{\mathsf{#1}}}
+\newcommand{\KIND}{\ATOM{KIND}}
+\newcommand{\TYPE}{\ATOM{TYPE}}
+\newcommand{\EL}[1]{\ATOM{EL}\:#1}
+
+We have a system of \emph{kinds}, kind checking and kind synthesis. Contexts assign kinds to free variables. We write $\dashv x:K$ to assert such an assignment. We write context lookups and context extensions in rules, but never the contexts themselves.
+\[
+\Rule{e\in J\quad J\le K}
+     {K\ni \NE e}
+\qquad
+\Rule{\dashv x:K}
+     {x\in K}
+\qquad
+\Rule{\KIND\ni K\quad K\ni t}
+     {t\hb K \in K}
+\qquad
+\NE{t\hb K}\leadsto t
+\] 
+
+Subkinding is certainly reflexive.
+\[
+\Axiom{K\le K}
+\]
+We shall ensure that transitivity is admissible, and that so is subsumption.
+\[
+\textbf{Admissibly,}\qquad
+\Rule{I\le J \quad J\le K}
+     {I\le K}
+\qquad
+\Rule{J\ni t\quad J\le K}
+     {K\ni t}
+\]
+We also allow kinds to compute before checking and after synthesis.
+\[
+\Rule{J\leadsto K\quad K\ni t}
+     {J\ni t}
+\qquad
+\Rule{e\in J\quad J\leadsto K}
+     {e\in K} 
+\]
+
+
+\section{type theory as we know it}
+
+Types are a kind.
+Each type gives rise to the kind of its elements.
+\[
+\Axiom{\KIND\ni\TYPE}
+\qquad
+\Rule{\TYPE\ni T}
+     {\KIND\ni \EL T}
+\]
+
+
+Function types work like this.
+\[\begin{array}{c}
+\Rule{x:\EL S \vdash \TYPE\ni T}
+     {\TYPE\ni \PI xST}
+\qquad
+\Rule{x:\EL S \vdash \EL T\ni t}
+     {\EL{\PI xST} \ni \LA xt}
+\\
+\Rule{f\in \EL{\PI xS{T\sbs x}}\quad \EL S \ni s}
+     {f\:s\in \EL {T\sbs{s\hb S}}}
+\\
+(\LA x{t\sbs x} : \EL{\PI xS{T\sbs x}})\:s\leadsto
+t(s\hb \EL S):\EL{T(s\hb \EL S)}
+\\
+\Rule{\EL{S'}\le \EL S\quad x:\EL{S'}\vdash \EL T\le \EL{T'}}
+     {\EL{\PI xST}\le\EL{\PI x{S'}{T'}}}
+\end{array}\]
+
+Pair types work like this.
+\[\begin{array}{c}
+\Rule{x:\EL\:S \vdash \TYPE\ni T}
+     {\TYPE\ni \SG xST}
+\qquad
+\Rule{\EL\:S\ni s\qquad \EL\:T\sbs{s\hb\EL\:S}\ni t}
+     {\EL\:\SG xS{T\sbs x} \ni s\pr t}
+\\
+\Rule{p\in \EL\:\SG xST}
+     {p\:\car\in \EL S}
+\qquad
+\Rule{p\in \EL\:\SG xS{T\sbs x}}
+     {p\:\cdr\in \EL\:T\sbs{s\hb S}}
+\\
+(s\pr t : \EL\:\SG xST)\:\car\leadsto
+s\hb \EL\:S \\
+(s\pr t : \EL\:\SG xS{T\sbs x})\:\cdr\leadsto
+t\hb \EL\:T\sbs{p\:\car}
+\\
+\Rule{\EL{S}\le \EL{S'}\quad x:\EL S\vdash \EL T\le \EL{T'}}
+     {\EL{\SG xST}\le\EL{\SG x{S'}{T'}}}
+\end{array}\]
+
+There will probably be more stuff.
+
+
+\section{segmentations and points}
+
+\newcommand{\SE}{\ATOM{SEG}}
+\newcommand{\PO}[1]{\ATOM{POINT}\:#1}
+\newcommand{\da}{\Atom{-}}
+\newcommand{\se}[1]{\Atom{\{}#1\Atom{\}}}
+\newcommand{\PL}{\atom{0}}
+\newcommand{\PR}{\atom{1}}
+\newcommand{\SL}{\atom{\blacktriangleleft}}
+\newcommand{\SR}{\atom{\blacktriangleright}}
+\newcommand{\sy}[1]{#1^{\green{\circ}}}
+
+Segmentations are a kind, and so are points in segmentations.
+\[
+\Axiom{\KIND\ni\SE}\qquad
+\Rule{\SE\ni\sigma}
+     {\KIND\ni\PO\sigma}
+\]
+There is a trivial segmentations. All segmentations have endpoints.
+\[
+\Axiom{\SE\ni\da}\qquad
+\Axiom{\PO\sigma\ni\PL}\qquad 
+\Axiom{\PO\sigma\ni\PR}
+\]
+But there are also nontrivial segmentations.
+\[
+\Rule{\SE\ni\sigma\quad \TYPE\ni T\quad \SE\ni\tau}
+     {\SE\ni\se{\sigma T \tau}}
+\]
+These have inner points.
+\[
+\Rule{\PO\sigma\ni p}
+     {\PO\se{\sigma T \tau}\ni\SL p}
+\qquad
+\Rule{\PO\tau\ni p}
+     {\PO\se{\sigma T \tau}\ni\SR p}
+\]
+The equational theory of points admits
+\[
+\SL\PL\leadsto \PL\qquad
+\SL\PR\leadsto \SR\PL \qquad
+\SR\PR\leadsto \PR
+\]
+Each segmentation has its opposite. There are no neutral segmentations,
+so this involutive operation computes fully.
+\[
+\sy\da = \da\qquad
+\sy{(\se{\sigma T \tau})} = \se{\sy\tau T \sy\sigma}
+\]
+However, there will be variables which stand for points, so opposite is
+an eliminator for points.
+\[
+\Rule{e\in\PO\sigma}
+     {\sy e\in\PO{\sy\sigma}}
+\]
+It computes as follows.
+\[\begin{array}{c}
+\sy{(\PL\hb\PO\sigma)}\leadsto \PR\hb\PO{\sy\sigma} \\
+\sy{(\SL p\hb\PO{\se{\sigma T \tau}})}\leadsto \SR(p\hb\PO\sigma)\hb\PO{\se{\sy\tau T \sy\sigma}} \\
+\sy{(\SR p\hb\PO{\se{\sigma T \tau}})}\leadsto \SL(p\hb\PO\tau)\hb\PO{\se{\sy\tau T \sy\sigma}} \\
+\sy{(\PR\hb\PO\sigma)}\leadsto \PL\hb\PO{\sy\sigma} \\
+\sy{(\sy{i})} \leadsto i
+\end{array}\]
+Note that a neutral point is either a point variable or its opposite.
+
+Segmentations are ordered by \emph{subtlety}, which induces subkinding.
+\[
+\Axiom{\da\le\sigma}
+\qquad
+\Rule{\sigma\le\sigma'\quad
+      \TYPE\ni T \equiv T' \quad
+      \tau\le\tau'}
+     {\se{\sigma T\tau}\le\se{\sigma' T'\tau'}}
+\qquad
+\Rule{\sigma\le\tau}
+     {\PO\sigma\le\PO\tau}
+\]
+
+
+\section{type paths}
+
+A type path type is given as a segmentation between two types.
+\[
+\Rule{\TYPE\ni S\quad \SE\ni\sigma\quad\TYPE\ni T}
+     {\TYPE\ni S\sigma T}
+\]
+A type path is an abstraction over the points in the segmentation which
+connects with the segmentation at all points.
+\newcommand{\conn}{\mathrel{\bowtie}}
+\[
+\Rule{i:\PO\sigma \vdash \TYPE \ni T\sbs i \quad
+      \TYPE\ni S\equiv T\sbs\PL \quad
+      T\sbs\cdot\conn\sigma \quad
+      \TYPE\ni T\sbs\PR \equiv U }
+     {\EL{S\sigma U}\ni\LA i T}
+\]
+Connection is given as follows:
+\[
+\Axiom{T\sbs\cdot\conn\da}
+\qquad
+\Rule{T\sbs{\SL\cdot}\conn\sigma\quad
+      \TYPE\ni S\equiv T\sbs{\SR\PL}\quad
+      T\sbs{\SR\cdot}\conn\tau}
+     {T\sbs\cdot\conn\se{\sigma S\tau}}
+\]
+
+Subtlety induces subtyping contravariantly, meaning that you can forget the
+existence of (hence connection with) intermediate points.
+\[
+\Rule{\sigma\le\tau}
+     {\EL{S\tau T}\le\EL{S\sigma T}}
+\]
+The elimination behaviour is by substitution.
+\[
+(\LA i T\sbs i: \EL{S\sigma U})\:p \leadsto T\sbs{p\hb\PO\sigma}:\TYPE
+\]
+The type path type tells us the types at all its \emph{canonical} points.
+\[\begin{array}{c}
+(S\sigma U).\PL = S\qquad
+(S\se{\sigma T\tau}U).\SL p = (S\sigma T).p\\
+(S\se{\sigma T\tau}U).\SR p = (T\tau U).p\qquad  
+(S\sigma U).\PR = U
+\end{array}\]
+So, given that type reconstruction is easy for neutrals, we may have
+\[
+Q\in\EL{S\sigma U}\wedge (S\sigma U).p = T \quad\Rightarrow\quad Q\:p\leadsto T\hb\TYPE
+\]
+
+If we know that a path has nontrivial segmentation, we can grab its segments.
+Let's write $Q\SL$ for the path $\LA i{Q\:(\SL i)}$ which is just the left segment
+of $Q$, and similarly $Q\SR$ for the right segment.
+
+\section{kinky paths}
+
+Next, we give you form of conditional expression to compute types from points in a
+piecewise continuous way.
+\newcommand{\kink}{\green{\mathsf{kink}}}
+\[
+\Rule{\begin{array}{c}
+      p\in\PO\pi\quad
+      \TYPE\ni S\quad \SE\ni\sigma \quad \TYPE\ni T \quad \SE\ni\tau \quad \TYPE\ni U \\
+      \pi\le\se{\sigma T\tau} \qquad \qquad \qquad \qquad
+      \EL{S\sigma T}\ni P \qquad \qquad
+      \EL{T\tau U}\ni Q \qquad \qquad
+     \end{array}}
+     {p\:\kink(S\sigma T\tau U|P\:Q)\in\TYPE}
+\]
+The conditional computes when we learn which half the point is in. Of course, the
+two halves meet in the middle.
+\[\begin{array}{c}
+(\PL\hb\PO\pi)\:\kink(S\_\_\_\_|P\:Q) \leadsto S\hb\TYPE \\
+(\SL p\hb\PO{\sigma T \tau}) \:\kink(S\_\_\_U|P\:Q)
+  \leadsto (P\hb\EL{S\sigma T})\:p \\
+(\SR p\hb\PO{\sigma T \tau}) \:\kink(S\_\_\_U|P\:Q)
+  \leadsto (Q\hb\EL{T\tau U})\:p \\
+ (\PR\hb\PO\pi)\:\kink(\_\_\_\_U|P\:Q) \leadsto U\hb\TYPE \\
+\end{array}\]
+
+Now, the subtlety is that the kinky construction can be more subtle
+than the point being projected from it: that just means we actually know more types
+at more points than we can be asked about. We can allow points that we're definitely
+not going to get asked for to wobble about a bit.
+\[\begin{array}{l}
+p\in\PO\da \wedge
+i:\PO\sigma \vdash \TYPE\ni S \equiv  (P\hb\EL{S\sigma T})\:i\\
+\quad\Rightarrow\quad
+p\:\kink(S\sigma T\tau U|P\:Q) \leadsto (Q\hb\EL{T\tau U})\:p
+\end{array}\]
+If $p$ can only refer to an \emph{endpoint} and $P$ is
+\emph{constant} (and equal to both $S$ and $T$) we can
+effective yank the midpoint all the way left, taking $Q$ as the whole path.
+Similarly,
+\[\begin{array}{l}
+p\in\PO\da \wedge
+i:\PO\sigma \vdash \TYPE\ni (Q\hb\EL{T\tau U})\:i \equiv U \\
+\quad\Rightarrow\quad
+p\:\kink(S\sigma T\tau U|P\:Q) \leadsto (P\hb\EL{S\sigma T})\:p
+\end{array}\]
+Moreover, if we're sure we're only going to project an endpoint, we can
+standardise the segmentation structure by shuffling kinks to the right.
+\[\begin{array}{l}
+p\in\PO\da \wedge\\
+i:\PO\sigma \vdash \TYPE\ni (P\hb\EL{S\sigma T})\:i \equiv
+  i\:\kink(S \sigma_0 S' \sigma_1 T|P_0\:P_1)\\
+\quad\Rightarrow\quad
+p\:\kink(S \sigma T \tau U|P\:Q) \\
+\qquad \leadsto \quad
+p\:\kink(S \sigma_0 S'\se{\sigma_1 T\tau}U|P_0\:\LA i{i\:\kink(S' \sigma_1 T\tau U|P_1\:Q)})
+\end{array}\]
+
+So we have acquired categorical structure for trivially segmented paths $S\da T$.
+If we have $\EL{S\da T}\ni P$ and $\EL{T\da U}\ni Q$, we get their composite
+\[
+\EL{S\da U}\ge
+\EL{S\se{\da T\da}U}\ni
+\LA i{i\:\kink(S\da T\da U|P\:Q)}
+\]
+where this composition absorbs identities (constant paths) and is associative.
+
+
+\section{transporting values along type paths}
+
+\newcommand{\xport}[4]{#4\green{(}#1\green{|}#2\green{\to}#3\green{)}}
+
+Let us now figure out how to transport values between points on a type path.
+\[
+\Rule{
+  \EL{S\sigma T}\ni Q\quad
+  \PO\sigma\ni p\quad
+  \PO\sigma\ni r\quad
+  \EL{Q\:p}\ni u}
+  {\xport Qpru\in \EL{Q\:r}}
+\]
+How should this work? For a start, the fact that we can decide equality of open
+things in point kinds means we can run on the spot.
+\[
+\xport Qiiu \leadsto u\hb \EL{Q\:i}
+\]
+
+We can also zoom. Here, matching against $\SL$ and $\SR$ should be liberal
+in the sense that $\SL i$ matches $\PL$ with $i=\PL$ and $\SR\PL$ with $i=\PR$,
+and similarly on the right.
+\[\begin{array}{c}
+\xport Q{\SL i}{\SL j}u \leadsto
+  \xport{\LA k{Q\:(\SL k)}}iju
+\\
+\xport Q{\SR i}{\SR j}u \leadsto
+  \xport{\LA k{Q\:(\SR k)}}iju
+\end{array}\]
+If we get a thing on each side, we go via the middle.
+\[\begin{array}{c}
+\xport Q{\SL i}{\SR j}u \leadsto
+  \xport Q{\SR\PL}{\SR j}{\xport Q{\SL i}{\SL \PR}u}
+\\
+\xport Q{\SR i}{\SL j}u \leadsto
+  \xport Q{\SL\PR}{\SL j}{\xport Q{\SR i}{\SR \PL}u}
+\end{array}\]
+
+If $i$ and $j$ are distinct but neutral, it's ok to be stuck.
+Real work must happen when $i$ and $j$ are a permutation of $\PL$ and $\PR$,
+and $\sigma\equiv\da$. That's as far as we can get by looking at the points.
+
+We can also look at the type $Q\:k$ we get at some arbitrary point
+$k\hb\PO\sigma$, which amounts to $\eta$-expanding, then peeking under the $\LA k{}$.
+Kinky paths transport in stages, e.g.:
+\[
+\xport{\LA k{k\:\kink(S\sigma T\tau U|P\:Q)}}\PL\PR s\leadsto
+  \xport Q\PL\PR{\xport P\PL\PR s}
+\]
+(What if the head isn't $k$? It's ok to be stuck, I think, because $s$ can't be canonical.)
+
+When we have handy $\eta$-laws and structural paths, we can be quite aggressive and
+still resolve critical pairs.
+\[\begin{array}{l}
+\xport{\LA k{\SG x{S\sbs k}{T\sbs{k,x}}}}iju \leadsto\\
+\quad
+\mbox{let}\;s\sbs k = \xport{\LA k{S\sbs k}}ik{(u\car)};
+          \;t\sbs k = \xport{\LA k{T\sbs{k,s\sbs k}}}ik{(u\cdr)}\\
+\quad
+\mbox{in}\;s\sbs j,t\sbs j
+\end{array}\]
+The coherence comes from the fact that we can extrude a value across the whole
+type path from any point on it. Functions are just as easy.
+\[\begin{array}{l}
+\xport{\LA k{\PI x{S\sbs k}{T\sbs{k,x}}}}iju \leadsto \LA x{}\\
+\quad
+\mbox{let}\;s\sbs k = \xport{\LA k{S\sbs k}}jkx;
+          \;t\sbs k = \xport{\LA k{T\sbs{k,s\sbs k}}}ik{(u\:s\sbs i)}\\
+\quad
+\mbox{in}\;t\sbs j
+\end{array}\]
+
+How about type paths? Composition!
+\[
+\xport{\LA k{S\sbs k\da T\sbs k}}\PL\PR Q \leadsto
+ (\LA k{S\sbs{\sy k}})\circ Q \circ (\LA k {T\sbs k})
+\]
+And if we have nontrivial segmentation, that's ok, too. We can transport the
+segments separately, then kink them back together.
+\[\begin{array}{l}
+\xport{\LA k{S\sbs k\se{\sigma\sbs k T\sbs k\tau\sbs k}U\sbs k}}\PL\PR Q \leadsto
+  \LA i{}\\
+  \quad
+  i\:\kink(S\sbs k \sigma\sbs k T\sbs k\tau\sbs kU\sbs k|\\
+  \qquad    (\xport{\LA k{S\sbs k \sigma\sbs k T\sbs k}}\PL\PR{Q\SL}) \\
+  \qquad    (\xport{\LA k{T\sbs k \tau\sbs k   U\sbs k}}\PL\PR{Q\SR}))
+\end{array}\]
+
+
+\end{document}
