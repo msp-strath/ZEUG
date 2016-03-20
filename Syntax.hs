@@ -50,7 +50,6 @@ module Syntax(
   pattern Weld,
   pattern One,
   pattern Path,
-  pattern Link,
   pattern At,
   Arity(..),
   etaquote,
@@ -95,9 +94,9 @@ pattern Lft sig = Atom "Left" :& sig :& N
 pattern Rht sig = Atom "Right" :& sig :& N
 pattern One = Atom "one" :& N
 pattern Path _S sig _T = Atom "Path" :& _S :& sig :& _T :& N
-pattern Link _Q _M _Q' = Atom "Link" :& _Q :& _M :& _Q' :& N
 pattern At p = Atom "@" :& p :& N
-pattern Stunk _S sig _U _Q _M _Q' = Atom "Stunk" :& _S :& sig :& _U :& _Q :& _M :& _Q' :& N
+pattern Kink _S sig _T tau _U _P _Q =
+  Atom "Kink" :& _S :& sig :& _T :& tau :& _U :& _P :& _Q :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -385,33 +384,24 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 (_   :::: El (Sg dom cod))     /: Fst = El dom
 p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (_   :::: El (Path _S sig _T)) /: At p = Type
-
+(_   :::: Point _)             /: path = Type
 -- given a thing and an action on it, what value do you get back?
 (/-) :: Worldly w => THING w -> Val w -> Val w
 (Lam s    :::: El (Pi dom cod ))    /- v    = s / (v :::: El dom)
 ((v :& w) :::: _               )    /- Fst  = v
 ((v :& w) :::: _               )    /- Snd  = w
-(_        :::: El (Path _S sig _T)) /- At p
-  | Just _X <- whereami _S sig _T p = _X
+
+-- a point acts on a path
 (Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
-(Link _Q _M _Q' :::: El (Path _S sig _T)) /- At p = (p :::: Point sig) /- Stunk _S sig _T _Q _M _Q'
-(Lft p :::: Point _) /- Stunk _S (Weld sig _M tau) _T _Q _ _Q' = (_Q  :::: El (Path _S sig _M)) /- At p
-(Rht p :::: Point _) /- Stunk _S (Weld sig _M tau) _T _Q _ _Q' = (_Q' :::: El (Path _M tau _T)) /- At p
-(Ze  :::: Point _) /- Stunk _S _ _ _ _ _ = _S
-(One :::: Point _) /- Stunk _ _ _T _ _ _ = _T
 
+-- a path acts on a point
+(Ze  :::: Point _) /-  Kink _S sig _T tau _U _P _Q = _S
+(Lft p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
+  (_P :::: El (Path _S sig _T)) /- At p
+(Rht p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
+  (_Q :::: El (Path _T sig _U)) /- At p
+(One :::: Point _) /- Kink _S sig _T tau _U _P _Q = _U
 (En n     :::: _               )    /- v    = En (n :/ v)
-
-whereami :: Val w -- left end type
-         -> Val w -- seg
-         -> Val w -- right end type
-         -> Val w -- point
-         -> Maybe (Val w)
-whereami _S sig               _T Ze      = Just _S
-whereami _S sig               _T One     = Just _T
-whereami _S (Weld sig _M tau) _T (Lft p) = whereami _S sig _M p
-whereami _S (Weld sig _M tau) _T (Rht p) = whereami _M tau _T p
-whereami _  _                 _  (En p)  = Nothing
 
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
@@ -506,27 +496,15 @@ netaquote (e :/ s)    =
     (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
     (El (Sg dom cod), Fst) -> e' :/ Fst
     (El (Sg dom cod), Snd) -> e' :/ Snd
-{-
-    (Point _,Stunk _S Dash _T _Q _M _Q') -> 
-      let t1 = (Decl,Point Dash) !- (\ i -> 
-                 if kEq Type (wk _S) (wk (_Q :::: El (Path _S Dash _M)) /- At (En (P i))) then Cheer else Fear)
-          t2 = (Decl,Point Dash) !- (\ i -> 
-                 if kEq Type (wk (_Q' :::: El (Path _M Dash _T)) /- At (En (P i))) (wk _T) then Cheer else Fear)
-      in case (t1,t2) of
-        (Fear  ,Fear ) -> 
-        (Fear  ,Cheer) -> e' :/ 
-        (Cheer ,Fear ) -> e'
-        (Cheer ,Cheer) -> e'
--}
-    (Point _,Stunk _S (Weld sig _M tau) _T _Q _ _Q') ->
-      e' :/ Stunk (etaquote (_S  :::: Type))
-                  (etaquote (sig :::: Seg))
-                  (etaquote (_T  :::: Type))
-                  (etaquote (_Q  :::: El (Path _S sig _M)))
-                  (etaquote (_M  :::: Type))
-                  (etaquote (_Q' :::: El (Path _M tau _T)))
-                  
     (El (Path _S seg _T), At p) -> e' :/ At (etaquote (p :::: Point seg))
+    (Point _, Kink _S sig _T tau _U _P _Q) -> e' :/ Kink
+      (etaquote (_S  :::: Type))
+      (etaquote (sig :::: Seg))
+      (etaquote (_T  :::: Type))
+      (etaquote (tau :::: Seg))
+      (etaquote (_U  :::: Type))
+      (etaquote (_P  :::: El (Path _S sig _T)))
+      (etaquote (_Q  :::: El (Path _T tau _U)))
   where
   (e' , ty) = netaquote e
 netaquote (glob :% g) = (glob :% emap etaquote g', eval (wk t) g')
