@@ -397,6 +397,7 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 -- a path acts on a point
 x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
 x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
+x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y = _X
 (Ze  :::: Point _) /-  Kink _S sig _T tau _U _P _Q = _S
 (Lft p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
   (_P :::: El (Path _S sig _T)) /- At p
@@ -418,15 +419,23 @@ yankRight (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
   case ((Decl,(Point Dash :: Val w)) !- \ i -> kEq' Type (wk (_Q :::: El (Path _T tau _U)) /- At (En (P i))) (wk _U)) of
     Cheer -> Just $ (_P :::: El (Path _S sig _T)) /- At p
     Fear  -> Nothing
-{-
+
 shuffle :: Worldly w => THING w -> Val w -> Maybe (Val w)
-shuffle (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
-  case ((Decl,(Point Dash :: Val w)) !- \i -> case wk (_P :::: El (Path _S sig _T)) /- At (En (P i)) of
-         En (P i :/ Kink _ _ _ _ _ _ _) -> Cheer
-         _                              -> Fear) of
-    Cheer -> Just undefined
+shuffle (p :::: (Point Dash :: Val w)) (Kink _S (Weld sig0 _S' sig1) _T tau _U _P _Q) =
+  case ((Decl,(Point Dash :: Val w)) !- \i ->
+         case wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) /- At (En (P i)) of
+           En (P i :/ Kink _ _ _ _ _ _ _) -> Cheer
+           _                              -> Fear) of
+    Cheer -> Just $ (p :::: Point Dash) /- Kink _S sig0 _S' (Weld sig1 _T tau) _U
+             (valOf $ focusL (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)))
+             (Lam $ Scope E0 (En (V FZero :/ vclosed (Kink (etaquote (_S' :::: Type)) (etaquote (sig1 :::: Seg)) (etaquote (_T :::: Type)) (etaquote (tau :::: Seg)) (etaquote (_U :::: Type)) (etaquote (focusR (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)))) (etaquote (_Q :::: El (Path _T tau _U)))))))
     Fear  -> Nothing
--}    
+
+focusL :: Worldly w => THING w -> THING w
+focusL (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) = val (Lam $ (Decl,Point sig0) !- \ (i :: Ref w') -> etaquote (wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T))  / At (Lft (En (P i) :: Val w')))) :::: El (Path _S sig0 _S')
+
+focusR :: Worldly w => THING w -> THING w
+focusR (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) = val (Lam $ (Decl,Point sig1) !- \ (i :: Ref w') -> etaquote (wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T))  / At (Rht (En (P i) :: Val w')))) :::: El (Path _S' sig1 _T)
 
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
