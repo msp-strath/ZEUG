@@ -395,13 +395,38 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
 
 -- a path acts on a point
+x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
+x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
 (Ze  :::: Point _) /-  Kink _S sig _T tau _U _P _Q = _S
 (Lft p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
   (_P :::: El (Path _S sig _T)) /- At p
 (Rht p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
   (_Q :::: El (Path _T sig _U)) /- At p
 (One :::: Point _) /- Kink _S sig _T tau _U _P _Q = _U
+
+
 (En n     :::: _               )    /- v    = En (n :/ v)
+
+yankLeft :: Worldly w => THING w -> Val w -> Maybe (Val w)
+yankLeft (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
+  case ((Decl,(Point Dash :: Val w)) !- \ i -> kEq' Type (wk _S) (wk (_P :::: El (Path _S sig _T)) /- At (En (P i)))) of
+    Cheer -> Just $ (_Q :::: El (Path _T tau _U)) /- At p
+    Fear  -> Nothing
+
+yankRight :: Worldly w => THING w -> Val w -> Maybe (Val w)
+yankRight (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
+  case ((Decl,(Point Dash :: Val w)) !- \ i -> kEq' Type (wk (_Q :::: El (Path _T tau _U)) /- At (En (P i))) (wk _U)) of
+    Cheer -> Just $ (_P :::: El (Path _S sig _T)) /- At p
+    Fear  -> Nothing
+{-
+shuffle :: Worldly w => THING w -> Val w -> Maybe (Val w)
+shuffle (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
+  case ((Decl,(Point Dash :: Val w)) !- \i -> case wk (_P :::: El (Path _S sig _T)) /- At (En (P i)) of
+         En (P i :/ Kink _ _ _ _ _ _ _) -> Cheer
+         _                              -> Fear) of
+    Cheer -> Just undefined
+    Fear  -> Nothing
+-}    
 
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
@@ -483,7 +508,9 @@ etaquote _Q@(_ :::: Path _S seg _T) = Lam $
 
 etaquote (En e       :::: _              ) = En  (fst (netaquote e))
 
-data Wibble w = Cheer | Fear
+data Wibble w where
+  Cheer :: Wibble w
+  Fear  :: Wibble w
 
 instance Dischargeable Wibble Wibble where
   discharge _ Cheer = Cheer
@@ -522,3 +549,6 @@ instance Worldly w => Eq (Ne w) where
 -- type directed equality test on values
 kEq :: Worldly w => Kind w -> Val w -> Val w -> Bool
 kEq k v v' = etaquote (v  :::: k) == etaquote (v' :::: k)
+
+kEq' :: Worldly w => Kind w -> Val w -> Val w -> Wibble w
+kEq' k v v' = if kEq k v v' then Cheer else Fear
