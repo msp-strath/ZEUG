@@ -38,6 +38,8 @@ module Syntax(
   pattern Level,
   pattern Ze,
   pattern Su,
+  pattern RawPi,
+  pattern RawSg,
   pattern Pi,
   pattern Sg,
   pattern Fst,
@@ -181,6 +183,9 @@ envHetEq _        _          = False
 pattern Nil = Atom ""
 
 -- Pi, Sg :: Tm p w -> Body p w -> Tm p w
+pattern RawPi s t = Atom "Pi" :& s :& t :& Nil
+pattern RawSg s t = Atom "Sg" :& s :& t :& Nil
+
 pattern Pi s t = Atom "Pi" :& s :& Lam t :& Nil
 pattern Sg s t = Atom "Sg" :& s :& Lam t :& Nil
 
@@ -311,15 +316,6 @@ instance Dischargeable (Tm (Syn Zero)) (Tm (Syn One)) where
 instance Dischargeable Happy Happy where
   discharge _ Happy = Happy -- :)
 
-type family EQ x y where
-  EQ x x = True
-  EQ x y = False
-
-type family OR x y where
-  OR True  y =    True
-  OR x     True  = True
-  OR False y     = y
-  OR x     False = x
 
 type family WorldLT (w :: World)(w' :: World) :: Bool where
   WorldLT w (Bind w') = WorldLE w w'
