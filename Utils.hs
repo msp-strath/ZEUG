@@ -1,11 +1,29 @@
 {-# LANGUAGE KindSignatures, DataKinds, EmptyCase, GADTs,
              DeriveFunctor, StandaloneDeriving, PolyKinds,
-             TypeOperators, ScopedTypeVariables, RankNTypes #-}
+             TypeOperators, ScopedTypeVariables, RankNTypes,
+             TypeFamilies, UndecidableInstances #-}
 module Utils where
+
+type family EQ x y where
+  EQ x x = True
+  EQ x y = False
+
+type family OR x y where
+  OR True  y =    True
+  OR x     True  = True
+  OR False y     = y
+  OR x     False = x
 
 data Nat = Zero | Suc Nat deriving Show
 
 type One = Suc Zero
+
+type family NatLT (m :: Nat) (n :: Nat) where
+  NatLT m (Suc n) = NatLE m n
+  NatLT _  _      = False
+
+type family NatLE (m :: Nat) (n :: Nat) where
+  NatLE m n = OR (EQ m n) (NatLT m n)
 
 data Fin (n :: Nat) where
   FZero :: Fin (Suc n)
