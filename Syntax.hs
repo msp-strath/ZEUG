@@ -392,21 +392,27 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 ((v :& w) :::: _               )    /- Snd  = w
 
 -- a point acts on a path
+(_     :::: El path@(Path _S sig _T)) /- At p | Just _X <- canonPoint path p = _X
 (Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
 
 -- a path acts on a point
-x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
-x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
-x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y = _X
 (Ze  :::: Point _) /-  Kink _S sig _T tau _U _P _Q = _S
 (Lft p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
   (_P :::: El (Path _S sig _T)) /- At p
 (Rht p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
   (_Q :::: El (Path _T sig _U)) /- At p
 (One :::: Point _) /- Kink _S sig _T tau _U _P _Q = _U
-
-
+x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
+x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
+x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y = _X
 (En n     :::: _               )    /- v    = En (n :/ v)
+
+canonPoint :: Val w -> Val w -> Maybe (Val w)
+canonPoint (Path _S sig _T) Ze  = Just _S
+canonPoint (Path _S (Weld sig _M tau) _T) (Lft p) = canonPoint (Path _S sig _M) p
+canonPoint (Path _S (Weld sig _M tau) _T) (Rht p) = canonPoint (Path _M tau _T) p
+canonPoint (Path _S sig _T) One = Just _T
+-- one, left, right
 
 yankLeft :: Worldly w => THING w -> Val w -> Maybe (Val w)
 yankLeft (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
