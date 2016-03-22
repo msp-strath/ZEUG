@@ -93,6 +93,7 @@ pattern Weld sig _T tau = Atom "Weld" :& sig :& _T :& tau :& N
 pattern Lft sig = Atom "Left" :& sig :& N
 pattern Rht sig = Atom "Right" :& sig :& N
 pattern One = Atom "one" :& N
+pattern Inv p = Atom "Inv" :& p :& N
 pattern Path _S sig _T = Atom "Path" :& _S :& sig :& _T :& N
 pattern At p = Atom "@" :& p :& N
 pattern Kink _S sig _T tau _U _P _Q =
@@ -402,6 +403,14 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (Rht p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
   (_Q :::: El (Path _T sig _U)) /- At p
 (One :::: Point _) /- Kink _S sig _T tau _U _P _Q = _U
+(Inv p :::: Point seg) /- Kink _S sig _T tau _U _P _Q =
+  (p :::: Point (invseg seg)) /- Kink _U
+                                      (invseg tau)
+                                      _T
+                                      (invseg sig)
+                                      _S
+                                      (flipPath (_P :::: El (Path _S sig _T)))
+                                      (flipPath (_Q :::: El (Path _T tau _U)))
 x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
 x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
 x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y = _X
@@ -409,10 +418,18 @@ x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x 
 
 canonPoint :: Val w -> Val w -> Maybe (Val w)
 canonPoint (Path _S sig _T) Ze  = Just _S
+canonPoint (Path _S sig _T) (Inv p) = canonPoint (Path _T (invseg sig) _S) p
 canonPoint (Path _S (Weld sig _M tau) _T) (Lft p) = canonPoint (Path _S sig _M) p
 canonPoint (Path _S (Weld sig _M tau) _T) (Rht p) = canonPoint (Path _M tau _T) p
 canonPoint (Path _S sig _T) One = Just _T
--- one, left, right
+
+invseg :: Tm p w -> Tm p w
+invseg Dash = Dash
+invseg (Weld sig _M tau) = Weld (invseg tau) _M (invseg sig)
+
+flipPath :: Worldly w => THING w -> Val w
+flipPath p@(_P :::: El (Path _S sig _T)) =
+  val $ Lam $ (Decl,Point Dash :: Val w) !- \ (i :: Ref w') -> etaquote (wk p / At (Inv (En (P i) :: Val w')))
 
 yankLeft :: Worldly w => THING w -> Val w -> Maybe (Val w)
 yankLeft (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
@@ -426,6 +443,7 @@ yankRight (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
     Cheer -> Just $ (_P :::: El (Path _S sig _T)) /- At p
     Fear  -> Nothing
 
+-- this is wrong, it assumes that the seg is a weld
 shuffle :: Worldly w => THING w -> Val w -> Maybe (Val w)
 shuffle (p :::: (Point Dash :: Val w)) (Kink _S (Weld sig0 _S' sig1) _T tau _U _P _Q) =
   case ((Decl,(Point Dash :: Val w)) !- \i ->
