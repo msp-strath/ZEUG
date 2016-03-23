@@ -74,6 +74,13 @@ import Prelude hiding ((/))
 -- contexts of free variables
 data World = W0 | Bind World
 
+-- world indexed stuff
+data W5Tuple f (w :: World) = W5Tuple (f w, f w, f w, f w, f w)
+
+data WMaybe (f :: World -> *)(w :: World) where
+  WJust :: f w -> WMaybe f w
+  WNothing :: WMaybe f w
+
 data Phase = Syn Nat | Sem
 
 pattern N = Atom ""
@@ -311,6 +318,14 @@ instance Dischargeable (Tm (Syn Zero)) (Tm (Syn One)) where
 instance Dischargeable Happy Happy where
   discharge _ Happy = Happy -- :)
 
+instance Dischargeable f g => Dischargeable (W5Tuple f) (W5Tuple g) where
+  discharge x (W5Tuple (f1,f2,f3,f4,f5)) =
+    W5Tuple (discharge x f1,discharge x f2, discharge x f3,discharge x f4,discharge x f5)
+
+instance Dischargeable f g => Dischargeable (WMaybe f) (WMaybe g) where
+  discharge x (WJust f) = WJust (discharge x f)
+  discharge x WNothing = WNothing
+
 type family EQ x y where
   EQ x x = True
   EQ x y = False
@@ -411,9 +426,9 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
                                       _S
                                       (flipPath (_P :::: El (Path _S sig _T)))
                                       (flipPath (_Q :::: El (Path _T tau _U)))
-x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
-x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
-x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y = _X
+x@(p :::: Point _) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
+x@(p :::: Point _) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
+x@(p :::: Point _) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y = _X
 (En n     :::: _               )    /- v    = En (n :/ v)
 
 canonPoint :: Val w -> Val w -> Maybe (Val w)
@@ -436,24 +451,46 @@ yankLeft (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
   case ((Decl,(Point Dash :: Val w)) !- \ i -> kEq' Type (wk _S) (wk (_P :::: El (Path _S sig _T)) /- At (En (P i)))) of
     Cheer -> Just $ (_Q :::: El (Path _T tau _U)) /- At p
     Fear  -> Nothing
+yankLeft _ _ = Nothing -- not a dash seg
+
 
 yankRight :: Worldly w => THING w -> Val w -> Maybe (Val w)
 yankRight (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
   case ((Decl,(Point Dash :: Val w)) !- \ i -> kEq' Type (wk (_Q :::: El (Path _T tau _U)) /- At (En (P i))) (wk _U)) of
     Cheer -> Just $ (_P :::: El (Path _S sig _T)) /- At p
     Fear  -> Nothing
-
--- this is wrong, it assumes that the seg is a weld
+yankRight _ _ = Nothing -- not a dash seg
+  
 shuffle :: Worldly w => THING w -> Val w -> Maybe (Val w)
-shuffle (p :::: (Point Dash :: Val w)) (Kink _S (Weld sig0 _S' sig1) _T tau _U _P _Q) =
-  case ((Decl,(Point Dash :: Val w)) !- \i ->
-         case wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) /- At (En (P i)) of
-           En (P i :/ Kink _ _ _ _ _ _ _) -> Cheer
-           _                              -> Fear) of
-    Cheer -> Just $ (p :::: Point Dash) /- Kink _S sig0 _S' (Weld sig1 _T tau) _U
-             (valOf $ focusL (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)))
-             (Lam $ Scope E0 (En (V FZero :/ vclosed (Kink (etaquote (_S' :::: Type)) (etaquote (sig1 :::: Seg)) (etaquote (_T :::: Type)) (etaquote (tau :::: Seg)) (etaquote (_U :::: Type)) (etaquote (focusR (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)))) (etaquote (_Q :::: El (Path _T tau _U)))))))
-    Fear  -> Nothing
+shuffle thing@(p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) = case help thing of
+  WJust (W5Tuple (sig0,_S',sig1,_P0,_P1)) -> Just $ thing /- Kink
+    _S
+    (val1 sig0)
+    (val1 _S')
+    (Weld (val1 sig1) _T tau)
+    _U
+    (val1 _P0)
+    (val (Lam (En (V FZero :/ Kink
+       _S'
+       sig1
+       (vclosed (etaquote (_T :::: Type)))
+       (vclosed (etaquote (tau :::: Seg)))
+       (vclosed (etaquote (_U :::: Type)))
+       _P1
+       (vclosed (etaquote (_Q :::: El (Path _T tau _U))))))))
+  _ -> Nothing
+  where
+  val1 t = eval t (ES E0 thing)
+  help :: Worldly w => THING w -> WMaybe (W5Tuple (Tm (Syn One))) w
+  help p = 
+     (Decl,Point Dash) !- \(i :: Ref w') -> case wk p /- At (En (P i) :: Val w') of
+      En (P i :/ Kink _S sig0 _S' sig1 _T _P0 _P1) -> WJust $ W5Tuple
+        (etaquote (sig0 :::: Seg),
+         etaquote (_S' :::: Type),
+         etaquote (sig1 :::: Seg),
+         etaquote (_P0 :::: El (Path _S sig0 _S')),
+         etaquote (_P1 :::: El (Path _S' sig1 _T)))
+      _ -> WNothing
 
 focusL :: Worldly w => THING w -> THING w
 focusL (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) = val (Lam $ (Decl,Point sig0) !- \ (i :: Ref w') -> etaquote (wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T))  / At (Lft (En (P i) :: Val w')))) :::: El (Path _S sig0 _S')
@@ -511,7 +548,7 @@ instance Eval Tm Val where
 val :: Worldly w => Eval t v => t (Syn Zero) w -> v w
 val t = eval t E0
 
-etaquote :: forall w. Worldly w => THING w -> TERM w
+etaquote :: Worldly w => THING w -> TERM w
 --etaquote (El ty      :::: Kind           ) = El  (etaquote (ty :::: Type))
 etaquote (Ze         :::: Level          ) = Ze
 etaquote (Su l       :::: Level          ) = Su  (etaquote (l :::: Level))
