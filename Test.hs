@@ -6,12 +6,14 @@
              TypeFamilies, StandaloneDeriving #-}
 module Test where
 
+import Prelude hiding (pi)
 import Utils
 import Syntax
+import PHOAS
 import TypeCheck
 
 import Layout
-import Raw
+import Raw hiding (var)
 import ProofState
 
 
@@ -45,20 +47,20 @@ testReport (name,test) = case runTest test of
 
 passtests = 
  [("test-1",ISKIND (El (Pi (Set Ze) (Set Ze))))
- ,("test0",CHECK (El (Pi (Set Ze) (Set Ze))) (Lam (En (V FZero))))
- ,("test1",INFER ((Lam (En (V FZero)) ::: El (Pi (Set (Su Ze)) (Set (Su Ze)))) :/ (Set Ze)) (El (Set (Su Ze))))
- ,("test1.5",ISKIND (El (Pi (Set Ze) (Pi (En (V FZero)) (En (V (FSuc (FZero))))))))
- ,("test2",CHECK (El (Pi (Set Ze) (Pi (En (V FZero)) (En (V (FSuc (FZero))))))) (Lam (Lam (En (V FZero)))))
+ ,("test0",CHECK (El (Pi (Set Ze) (Set Ze))) (lam var'))
+ ,("test1",INFER ((lam var' ::: El (Pi (Set (Su Ze)) (Set (Su Ze)))) :/ (Set Ze)) (El (Set (Su Ze))))
+ ,("test1.5",ISKIND (El (pi (Set Ze) $ \ a -> Pi (var' a) (var' a))))
+ ,("test2",CHECK (El (pi (Set Ze) $ \ a -> Pi (var' a) (var' a))) (Lam $ lam $ \ x -> var' x))
  ,("test3",INFER (Lam (Lam (En (V FZero))) ::: El (Pi (Set (Su Ze)) (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ (Set Ze)) (El (Pi (Set Ze) (Set Ze))))
- ,("test4",INFER (Lam (Lam (En (V FZero))) ::: El (Pi (Set (Su (Su Ze))) (Pi (En (V FZero)) (En (V (FSuc (FZero)))))) :/ (Set (Su Ze)) :/ (Set Ze)) (El (Set (Su Ze))))
+ ,("test4",INFER ((Lam $ lam var') ::: El (pi (Set (Su (Su Ze))) $ \ a -> Pi (var' a) (var' a)) :/ (Set (Su Ze)) :/ (Set Ze)) (El (Set (Su Ze))))
  ,("test5",CHECK (El (Sg (Set (Su Ze)) (Set (Su Ze)))) ((Set Ze) :& (Set Ze)))
  ,("test6",INFER ((((Set Ze) :& (Set Ze)) ::: El (Sg (Set (Su Ze)) (Set (Su Ze)))) :/ Fst) (El (Set (Su Ze))))
  ,("test7",INFER ((((Set Ze) :& (Set Ze)) ::: El (Sg (Set (Su Ze)) (Set (Su Ze)))) :/ Snd) (El (Set (Su Ze))))
  ,("test8",CHECK (El (Sg (Set (Su (Su Ze))) (En (V FZero)))) ((Set (Su Ze)) :& (Set Ze)))
  ,("test9",CHECK (El (Pi (Sg (Set Ze) (Set Ze)) (Set Ze))) (Lam (En ((V FZero) :/ Fst))))
- ,("test0",NORM (Lam (En (V FZero)) ::: El (Pi (Sg (Set Ze) (Set Ze)) (Sg (Set Ze) (Set Ze))))
-                   (Lam (En ((:/) (V FZero) (Atom "Fst")) :& En ((:/) (V FZero) (Atom "Snd")))))
- ,("testLet",CHECK (El (Set (Su Ze))) (Let ((Set (Su Ze)) ::: El (Set (Su (Su Ze)))) (En ((Set Ze) ::: El (En (V FZero))))))
+ ,("test0",NORM ((lam var') ::: El (Pi (Sg (Set Ze) (Set Ze)) (Sg (Set Ze) (Set Ze))))
+                 (lam $ \ p -> (En ((:/) (var p) (Atom "Fst")) :& En ((:/) (var p) (Atom "Snd")))))
+ ,("testLet",CHECK (El (Set (Su Ze))) (letin ((Set (Su Ze)) ::: El (Set (Su (Su Ze)))) $ \ x -> (En ((Set Ze) ::: El (var' x)))))
  ]
 
 failtests = map (fmap FAILS)

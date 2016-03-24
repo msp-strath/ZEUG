@@ -326,16 +326,6 @@ instance Dischargeable f g => Dischargeable (WMaybe f) (WMaybe g) where
   discharge x (WJust f) = WJust (discharge x f)
   discharge x WNothing = WNothing
 
-type family EQ x y where
-  EQ x x = True
-  EQ x y = False
-
-type family OR x y where
-  OR True  y =    True
-  OR x     True  = True
-  OR False y     = y
-  OR x     False = x
-
 type family WorldLT (w :: World)(w' :: World) :: Bool where
   WorldLT w (Bind w') = WorldLE w w'
   WorldLT w w'        = False
