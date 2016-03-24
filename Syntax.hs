@@ -100,7 +100,7 @@ pattern Weld sig _T tau = Atom "Weld" :& sig :& _T :& tau :& N
 pattern Lft sig = Atom "Left" :& sig :& N
 pattern Rht sig = Atom "Right" :& sig :& N
 pattern One = Atom "one" :& N
-pattern Inv p = Atom "Inv" :& p :& N
+pattern Op = Atom "Op" :& N
 pattern Path _S sig _T = Atom "Path" :& _S :& sig :& _T :& N
 pattern At p = Atom "@" :& p :& N
 pattern Kink _S sig _T tau _U _P _Q =
@@ -400,6 +400,7 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 (_   :::: El (Sg dom cod))     /: Fst = El dom
 p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (_   :::: El (Path _S sig _T)) /: At p = Type
+(_   :::: Point sig)           /: Op   = Point (invseg sig)
 (_   :::: Point _)             /: path = Type
 -- given a thing and an action on it, what value do you get back?
 (/-) :: Worldly w => THING w -> Val w -> Val w
@@ -411,6 +412,11 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (_     :::: El path@(Path _S sig _T)) /- At p | Just _X <- canonPoint path p = _X
 (Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
 
+-- inverting points
+(Ze    :::: Point _                ) /- Op = One
+(Lft p :::: Point (Weld sig _T tau)) /- Op = Rht ((p :::: Point sig) /- Op)
+(Rht p :::: Point (Weld sig _T tau)) /- Op = Lft ((p :::: Point tau) /- Op)
+(One   :::: Point _                ) /- Op = Ze
 -- a path acts on a point
 (Ze  :::: Point _) /-  Kink _S sig _T tau _U _P _Q = _S
 (Lft p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
@@ -418,8 +424,8 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (Rht p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
   (_Q :::: El (Path _T sig _U)) /- At p
 (One :::: Point _) /- Kink _S sig _T tau _U _P _Q = _U
-(Inv p :::: Point seg) /- Kink _S sig _T tau _U _P _Q =
-  (p :::: Point (invseg seg)) /- Kink _U
+(En (p :/ Op) :::: Point seg) /- Kink _S sig _T tau _U _P _Q = 
+  (En p :::: Point (invseg seg)) /- Kink _U
                                       (invseg tau)
                                       _T
                                       (invseg sig)
@@ -433,10 +439,11 @@ x@(p :::: Point _) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y =
 
 canonPoint :: Val w -> Val w -> Maybe (Val w)
 canonPoint (Path _S sig _T) Ze  = Just _S
-canonPoint (Path _S sig _T) (Inv p) = canonPoint (Path _T (invseg sig) _S) p
 canonPoint (Path _S (Weld sig _M tau) _T) (Lft p) = canonPoint (Path _S sig _M) p
 canonPoint (Path _S (Weld sig _M tau) _T) (Rht p) = canonPoint (Path _M tau _T) p
 canonPoint (Path _S sig _T) One = Just _T
+-- no case for Op as it would have already computed away if the point
+-- was canonical
 
 invseg :: Tm p w -> Tm p w
 invseg Dash = Dash
@@ -444,7 +451,7 @@ invseg (Weld sig _M tau) = Weld (invseg tau) _M (invseg sig)
 
 flipPath :: Worldly w => THING w -> Val w
 flipPath p@(_P :::: El (Path _S sig _T)) =
-  val $ Lam $ (Decl,Point Dash :: Val w) !- \ (i :: Ref w') -> etaquote (wk p / At (Inv (En (P i) :: Val w')))
+  val $ Lam $ (Decl,Point Dash :: Val w) !- \ (i :: Ref w') -> etaquote (wk p / At ((refThing i /- Op) :: Val w'))
 
 yankLeft :: Worldly w => THING w -> Val w -> Maybe (Val w)
 yankLeft (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
@@ -452,7 +459,6 @@ yankLeft (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
     Cheer -> Just $ (_Q :::: El (Path _T tau _U)) /- At p
     Fear  -> Nothing
 yankLeft _ _ = Nothing -- not a dash seg
-
 
 yankRight :: Worldly w => THING w -> Val w -> Maybe (Val w)
 yankRight (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
