@@ -20,7 +20,7 @@ type One = Suc Zero
 
 type family NatLT (m :: Nat) (n :: Nat) where
   NatLT m (Suc n) = NatLE m n
-  NatLT _  _      = False
+  NatLT m  n      = False -- wildcards not supported in ghc<8
 
 type family NatLE (m :: Nat) (n :: Nat) where
   NatLE m n = OR (EQ m n) (NatLT m n)
