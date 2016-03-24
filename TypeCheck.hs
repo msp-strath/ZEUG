@@ -100,10 +100,10 @@ El (Path _S sig _T) >:> Lam _M =
   Type >:> (_M // P i)                                      >>>= \ _ ->
   tcBool (kEq Type _S (Scope E0 _M / (Ze  :::: Point sig))) >>>= \ _ ->
   tcBool (kEq Type _T (Scope E0 _M / (One :::: Point sig)))
-El (Path _S Dash _U) >:> Link _Q _M _Q' = 
+{-El (Path _S Dash _U) >:> Link _Q _M _Q' = 
   Type                 >:>= _M  >>>= \ _M ->
   El (Path _S Dash _M) >:>  _Q  >>>= \ _ ->
-  El (Path _M Dash _U) >:>  _Q'
+  El (Path _M Dash _U) >:>  _Q' -}
 
 want            >:> En e =
   infer e >>>= \ got ->
