@@ -106,6 +106,10 @@ pattern At p = Atom "@" :& p :& N
 pattern Kink _S sig _T tau _U _P _Q =
   Atom "Kink" :& _S :& sig :& _T :& tau :& _U :& _P :& _Q :& N
 
+pattern Cons _P _T seq = Atom "Cons" :& _P :& _T :& seq
+pattern EndOf seq _T = Atom "EndOf" :& seq :& _T :& N
+
+
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
 type Val = Tm Sem
@@ -415,17 +419,39 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
   (_Q :::: El (Path _T sig _U)) /- At p
 (One :::: Point _) /- Kink _S sig _T tau _U _P _Q = _U
 (En (p :/ Op) :::: Point seg) /- Kink _S sig _T tau _U _P _Q = 
-  (En p :::: Point (invseg seg)) /- Kink _U
-                                      (invseg tau)
-                                      _T
-                                      (invseg sig)
-                                      _S
-                                      (flipPath (_P :::: El (Path _S sig _T)))
-                                      (flipPath (_Q :::: El (Path _T tau _U)))
-x@(p :::: Point _) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankLeft x y = _X
-x@(p :::: Point _) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- yankRight x y = _X
-x@(p :::: Point _) /- y@(Kink _S sig _T tau _U _P _Q) | Just _X <- shuffle x y = _X
+  (En p :::: Point (invseg seg)) /- Kink
+    _U
+    (invseg tau)
+    _T
+    (invseg sig)
+    _S
+    (flipPath (_P :::: El (Path _S sig _T)))
+    (flipPath (_Q :::: El (Path _T tau _U)))
+--x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q)
+--  | Just _X <- yankLeft x y = _X
+--x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q)
+--  | Just _X <- yankRight x y = _X
+-- x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q)
+--  | Just _X <- shuffle x y = _X
+(p :::: Point Dash) /- Kink _S sig _T tau _U _P _Q =
+  (p :::: Point Dash) /- EndOf (Cons _S _P (Cons _T _Q N)) _U
+(_   :::: Point _) /- EndOf N _T = _T
+(Ze  :::: Point _) /- EndOf (Cons _S _P _) _  = _S
+(One :::: Point _) /- EndOf (Cons _ _ _)   _S = _S
+(En (p :/ Op) :::: Point seg) /- EndOf _SPs _U =
+  (En p :::: Point (invseg seg)) /- invEndOf _SPs _U
 (En n     :::: _               )    /- v    = En (n :/ v)
+
+invEndOf  :: Val w -> Val w -> Val w
+invEndOf _SPs _U = list2atomList (_U : (reverse (atomList2List _SPs)))
+
+atomList2List :: Val w -> [Val w]
+atomList2List (Cons _S _P _SPs) = _S : _P : atomList2List _SPs
+atomList2List N                 = []
+
+list2atomList :: [Val w] -> Val w
+list2atomList []           = N
+list2atomList (_S:_P:_SPs) = Cons _S _P (list2atomList _SPs)
 
 canonPoint :: Val w -> Val w -> Maybe (Val w)
 canonPoint (Path _S sig _T) Ze  = Just _S
