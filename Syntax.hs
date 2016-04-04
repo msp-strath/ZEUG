@@ -403,7 +403,8 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 ((v :& w) :::: _               )    /- Snd  = w
 
 -- a point acts on a path
-(_     :::: El path@(Path _S sig _T)) /- At p | Just _X <- canonPoint path p = _X
+(_     :::: El path@(Path _S sig _T)) /- At p
+  | Just _X <- canonPoint path p = _X
 (Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
 
 -- inverting points
@@ -438,10 +439,26 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (_   :::: Point _) /- EndOf N _T = _T
 (Ze  :::: Point _) /- EndOf (Cons _S _P _) _  = _S
 (One :::: Point _) /- EndOf (Cons _ _ _)   _S = _S
-(En (p :/ Op) :::: Point seg) /- EndOf _SPs _U =
+(En (p :/ Op) :::: Point seg) /- EndOf _SPs _U = 
   (En p :::: Point (invseg seg)) /- invEndOf _SPs _U
+(En  n    :::: Point _         )    /- EndOf _SPs _U =
+  let (_SPs' :< _U') = process (En n) B0 (atomList2List _SPs ++ [_U])
+  in  En (n :/ EndOf (list2atomList (_SPs' <>>[])) _U')
 (En n     :::: _               )    /- v    = En (n :/ v)
 
+process :: Val w
+        -> Bwd (Val w)
+        -> [Val w]
+        -> Bwd (Val w)
+process i _SPs [] = _SPs
+
+process i (_SPs :< _T) (_Q : _U : _RVs) =
+  {- if Type `ni` Qi == T then process i _SPs _T  _RVs
+  else if Q i `reducesTo` i endOf T _QUs then
+    process i _(SPs :< _T) (_QUs ++ _RVs)
+  else -} process i (_SPs :< _T :< _Q  :< _U) _RVs
+
+                                 
 invEndOf  :: Val w -> Val w -> Val w
 invEndOf _SPs _U = list2atomList (_U : (reverse (atomList2List _SPs)))
 
@@ -455,8 +472,10 @@ list2atomList (_S:_P:_SPs) = Cons _S _P (list2atomList _SPs)
 
 canonPoint :: Val w -> Val w -> Maybe (Val w)
 canonPoint (Path _S sig _T) Ze  = Just _S
-canonPoint (Path _S (Weld sig _M tau) _T) (Lft p) = canonPoint (Path _S sig _M) p
-canonPoint (Path _S (Weld sig _M tau) _T) (Rht p) = canonPoint (Path _M tau _T) p
+canonPoint (Path _S (Weld sig _M tau) _T) (Lft p) =
+  canonPoint (Path _S sig _M) p
+canonPoint (Path _S (Weld sig _M tau) _T) (Rht p) =
+  canonPoint (Path _M tau _T) p
 canonPoint (Path _S sig _T) One = Just _T
 -- no case for Op as it would have already computed away if the point
 -- was canonical
@@ -633,7 +652,7 @@ netaquote (glob :% g) = (glob :% emap etaquote g', eval (wk t) g')
 
 -- We deliberately don't have a syntactic/structural equality for Ne.
 -- Also we don't have an Eq instance at all for Val as it is type directed.
-
+ 
 -- equality test on neutrals
 instance Worldly w => Eq (Ne w) where
   n == n' = fst (netaquote n) == fst (netaquote n')
