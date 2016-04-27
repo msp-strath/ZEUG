@@ -1,4 +1,4 @@
-# ZOIG
+# ZEUG
 being the beginnings of at least zero typecheckers
 
 ## Introduction

@@ -2,7 +2,7 @@
 
 module Layout where
 
--- This file is intended as a not especially ZOIG specific manager for the
+-- This file is intended as a not especially ZEUG specific manager for the
 -- lexical and layout structure of text, with an associated parser
 -- combinator library for the lexical structure thus emerging.
 --

@@ -89,7 +89,7 @@ ftestRig s = do
 main = do 
   mapM_ testReport (rawTests ++ passtests ++ failtests)
   -- can't do much else until we have a pretty printer
-  ftestRig "tests/tests.zoig"
+  ftestRig "tests/tests.zeug"
 
 blerk :: TC Val W0
 blerk = Kind >:>= El (Set Ze)
