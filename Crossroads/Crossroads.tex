@@ -71,7 +71,7 @@
 \titlebanner{banner above paper title}        % These are ignored unless
 \preprintfooter{short description of paper}   % 'preprint' option specified.
 
-\title{A Cubical Crossroads}
+\title{Quadratisch. Praktisch. Gut.}
 %\subtitle{Subtitle Text, if any}
 
 \authorinfo{Witheld}
@@ -95,7 +95,10 @@ dependent types, cubical sets
 
 \section{Introduction}
 
-We define a dependent type theory with the following properties:
+We define a dependent type theory, where values (including types, of
+course) can be joined by \emph{paths}, conceptualised as continuous
+functions over the interval $[0,1]$. This type theory has the
+following properties:
 \begin{description}
 \item[canonicity] closed expressions compute to canonical values;
 \item[substitutivity] paths between values yield
@@ -135,6 +138,155 @@ rejecting proof erasure for a run time computational system which
 computes the representation changes which implement type equivalences.
 
 
+\section{Bidirectional Type Theory, Still in Eden}
+
+\newcommand{\gs}{\;\mid\;}
+\newcommand{\neu}{\underline}
+\newcommand{\TYPE}{\bigstar}
+\newcommand{\EC}{\mathcal{E}}
+
+The syntax of our type theory has sorts (which are types of types)
+including a top sort $\TYPE$,
+terms (whose types are checked) embedding eliminations (whose types are
+synthesized) embedding variables in turn. Variables are assigned types by contexts.
+\[\begin{array}{rrl}
+\star & ::= & \TYPE \gs \ldots \\
+s,t,R,S,T & ::= & \star \gs \neu e \gs \ldots \\
+e,f,E,F & ::= & x \gs s\hb S \gs \ldots \\
+\Gamma & ::= & \EC \gs \Gamma,x\hb S \gs \ldots
+\end{array}\]
+
+The typing rules are presented via three judgment forms: checking,
+synthesis and subtyping. We omit contexts from typing rules, adopting
+the convention that the context at a rule's conclusion is distributed
+to all its premises. We thus need only write the \emph{extension} of
+a context with an entry for a fresh variable, $x\hb S\vdash \cdots$,
+or a context entry lookup for an existing variable $\dashv x\hb S$.
+This discipline not only saves space: it also helps us to ensure that
+the type system is stable under substitution by ensuring that we
+treat variables only in ways whch are compatible with how we treat
+terms. Before we add any `features' to our type theory, we must have
+at least the following.
+
+\[\begin{array}{c}
+\textsc{syn-var}\;
+\Rule{\dashv x\hb S}
+     {x\in S}
+\qquad\qquad
+\textsc{chk-syn}\;
+\Rule{e\in S\quad S\le T}
+     {T\ni \neu{e}}
+\\
+\textsc{syn-cut}\;
+\Rule{\TYPE\ni S\quad S\ni s}
+     {s\hb S\in S}
+\qquad\qquad
+\textsc{sub-refl}\;
+\Axiom{T\le T}
+\end{array}\]
+
+So, for variables we synthesize exactly the type assigned by the
+context; for cuts, we synthesize exactly the type proposed in the
+annotation (provided it is checkably a type and indeed the type of the
+term). The reason why a term with a type annotation is called a `cut':
+it is in some sense activated for computation by being labelled with
+its type, indicating its functionality.
+If we can synthesize the type of something, we may surely check
+it by requiring the type we get to be a subtype of the type we need,
+where subtyping is at the very least reflexive.
+
+Terms are blessed with a contraction scheme: cut elimination. A cut
+embedded directly back into the term syntax can do no computation and
+thus needs no annotation.
+\[
+\textsc{red-}\upsilon\quad
+\neu{t\hb T}\leadsto t
+\]
+
+As soon as we have computation, we need to know its impact on
+typechecking. We have rules which allow us to precompute types before
+checking and postcompute types after synthesis.
+\[
+\textsc{chk-pre}\;
+\Rule{T\leadsto R \quad R\ni t}
+     {T\ni t}
+\qquad
+\textsc{syn-post}\;
+\Rule{e\in S \quad S\leadsto R}
+     {e\in R}
+\]
+
+Let us add dependent pairs ($\Sigma$-types), by way of an example feature.
+\[\begin{array}{c}
+\textsc{chk-sg}\;
+\Rule{\star\ni S\quad x\hb S\vdash \star\ni T[x]}
+     {\star\ni (x\hb S)\times T[x]}
+\qquad
+\textsc{syn-1}\;
+\Rule{e\in (x\hb S)\times T[x]}
+     {e.1\in S}
+\\
+\textsc{chk-pair}\;
+\Rule{S\ni s\quad T[s\hb S]\ni t}
+     {(x\hb S)\times T[x]\ni s,t}
+\qquad
+\textsc{syn-2}\;
+\Rule{e\in (x\hb S)\times T[x]}
+     {e.2\in T[e.1]}
+\\
+\textsc{sub-sg}\;
+\Rule{S\le S' \quad x\hb S\vdash T[x]\le T'[x]}
+     {(x\hb S)\times T[x]\le(x\hb S')\times T'[x]}
+\end{array}\]
+Every sort is closed under the formation of
+$\Sigma$-types. $\Sigma$-types
+admit pairs, where the first component, once checked, is used to
+compute the type of the second. By putting introduction forms in
+the terms and elimination forms in the eliminations (hence the
+names), we ensure that introduction forms can only be eliminated
+at a cut which exposes the type at which activity is present.
+Computation, indeed, goes by $\beta$-rules.
+\[\begin{array}{c}
+\textsc{red-$\beta$-1}\quad 
+  (s,t:(x\hb S)\times T[x]).1 \leadsto s:S \\
+\textsc{red-$\beta$-2}\quad 
+  (s,t:(x\hb S)\times T[x]).2 \leadsto t:T[s\hb S]
+\end{array}
+\]
+So, a computation labelled as being at a compound type `decays' to
+subcomputations labelled at the components (or instances of them).
+Cuts bubble outwards through the elimination syntax, decaying as they go,
+until they reach the point where the result is embedded in a term,
+whereupon the cut can be eliminated.
+
+For function types, we see a similar pattern.
+\[\begin{array}{c}
+\textsc{chk-pi}\;
+\Rule{\star\ni S\quad x\hb S\vdash \star\ni T[x]}
+     {\star\ni (x\hb S)\to T[x]}
+\\
+\textsc{chk-lam}\;
+\Rule{x\hb S\vdash T[x]\ni t[x]}
+     {(x\hb S)\to T[x]\ni \lambda x.\,t[x]}
+\\
+\textsc{syn-app}\;
+\Rule{f\in (x\hb S)\times T[x]\quad S\ni s}
+     {f\:s \in T[s\hb S]}
+\\
+\textsc{sub-pi}\;
+\Rule{S'\le S \quad x\hb S'\vdash T[x]\le T'[x]}
+     {(x\hb S)\to T[x]\le(x\hb S')\to T'[x]}
+\\
+\textsc{red-}\beta\textsc{-app}\quad
+(\lambda x.\,t[x]:(x\hb S)\times T[x])\:s \leadsto t[s\hb S]:T[s\hb S]
+\end{array}\]
+
+
+\newcommand{\Type}[1]{\star^{#1}}
+
+
+
+
 %\appendix
 %\section{Appendix Title}
 %
@@ -142,7 +294,7 @@ computes the representation changes which implement type equivalences.
 
 \acks
 
-Many acknowledgments are due. I have had a lot of assistance, much
+Many acknowledgments are due. We have had a lot of assistance, much
 inspiration from colleagues and many enlightening conversations. Names
 will be named and honour bestowed if and when this paper ceases to be
 anonymous.
