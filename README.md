@@ -1,3 +1,6 @@
+# Status of this branch
+This fork called "segments" has a version of the system with segments. Currently, it contains an incomplete refactoring that hasn't been pushed all the way through to the proof state, I think it only goes as far as the typechecker.
+
 # ZEUG
 being the beginnings of at least zero typecheckers
 
