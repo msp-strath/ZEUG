@@ -151,7 +151,7 @@ terms (whose types are checked) embedding eliminations (whose types are
 synthesized) embedding variables in turn. Variables are assigned types by contexts.
 \[\begin{array}{rrl}
 \star & ::= & \TYPE \gs \ldots \\
-s,t,R,S,T & ::= & \star \gs \neu e \gs \ldots \\
+s,t,P,R,S,T & ::= & \star \gs \neu e \gs \ldots \\
 e,f,E,F & ::= & x \gs s\hb S \gs \ldots \\
 \Gamma & ::= & \EC \gs \Gamma,x\hb S \gs \ldots
 \end{array}\]
@@ -173,16 +173,19 @@ at least the following.
 \Rule{\dashv x\hb S}
      {x\in S}
 \qquad\qquad
+\textsc{syn-cut}\;
+\Rule{\TYPE\ni S\quad S\ni s}
+     {s\hb S\in S}
+\\
 \textsc{chk-syn}\;
 \Rule{e\in S\quad S\le T}
      {T\ni \neu{e}}
 \\
-\textsc{syn-cut}\;
-\Rule{\TYPE\ni S\quad S\ni s}
-     {s\hb S\in S}
-\qquad\qquad
 \textsc{sub-refl}\;
 \Axiom{T\le T}
+\qquad\qquad
+\textsc{sub-top}\;
+\Axiom{\star \le \TYPE}
 \end{array}\]
 
 So, for variables we synthesize exactly the type assigned by the
@@ -281,11 +284,120 @@ For function types, we see a similar pattern.
 (\lambda x.\,t[x]:(x\hb S)\times T[x])\:s \leadsto t[s\hb S]:T[s\hb S]
 \end{array}\]
 
+Let us add Booleans as a base type in every sort, but with large elimination.
+\newcommand{\Two}{2}
+\newcommand{\true}{\mathsf{t\!t}}
+\newcommand{\false}{\mathsf{f\!f}}
+\newcommand{\iffy}[4]{(\textsc{if}\:(#1.\,#2)\:#3\:#4)}
+\[\begin{array}{c}
+\textsc{chk-two}\;
+\Axiom{\star\ni \Two}\qquad
+\textsc{chk-tt}\;
+\Axiom{\Two\ni \true}\qquad
+\textsc{chk-ff}\;
+\Axiom{\Two\ni \false}\\
+\textsc{syn-if}\;
+\Rule{e\in\Two\quad b\hb\Two\vdash \TYPE\ni P[b]\quad
+      P[\true\hb\Two]\ni t\quad P[\false\hb\Two]\ni f}
+     {e\:\iffy{b}{P[b]}{t}{f}\in P[e]}\\
+\textsc{red-}\beta\textsc{-if-tt}\quad
+(\true\hb\Two)\:\iffy{b}{P[b]}{t}{f} \leadsto t\hb P[\true\hb\Two] \\
+\textsc{red-}\beta\textsc{-if-ff}\quad
+(\false\hb\Two)\:\iffy{b}{P[b]}{t}{f} \leadsto f\hb P[\false\hb\Two] \\
+\end{array}\]
+
+We can also have empty and unit types.
+\newcommand{\Zero}{\mathsf{0}}
+\newcommand{\One}{\mathsf{1}}
+\newcommand{\void}{\langle\rangle}
+\newcommand{\magic}[1]{(\textsc{magic}\:#1)}
+\[\begin{array}{c}
+\textsc{chk-zero}\;
+\Axiom{\star\ni \Zero}\qquad
+\textsc{chk-one}\;
+\Axiom{\star\ni \One}\\
+\textsc{syn-magic}\;
+\Rule{e\in\Zero\quad \TYPE\ni P}
+     {e\:\magic{P}\in P}\qquad
+\textsc{chk-void}\;
+\Axiom{\One\ni \void}\\
+\end{array}\]
+We could add a dependent eliminator for $\One$, asserting that every
+element is $\void$, or we could just add an $\eta$-rule.
 
 \newcommand{\Type}[1]{\star^{#1}}
 
+\textbf{datatypes of some sort?}
+
+\newcommand{\jq}{\cong}
+\textbf{introduce the judgmental equality} $\jq$
 
 
+\section{Paths As Abstractions Over the Interval}
+
+The term `equality' is laden with philosophical baggage. Let us slough
+off that burden and consider the idea of connecting things with paths.
+There might very well be information in a path connecting things that
+is not already in the things themselves: for example, a road route
+connecting Geneva and Montreux will have to go around Lake Geneva one
+way or the other. Of course, we shall need to know how to construct
+paths and how we expect to be able to use them.
+
+\newcommand{\pl}{0}
+\newcommand{\pr}{1}
+The key mechanism of cubical type theories is the idea of constructing
+paths in a pointwise manner: we allow a parameter $i$ to vary
+`continuously' between $\pl$ and $\pr$, and we give a construction
+$t[i]$ valid at all $i$, thus exposing a connection between $t[\pl]$
+and $t[\pr]$. Of course, paths are constructions, too, so we can form
+paths-between-paths by abstracting over one parameter a construction
+which then abstracts over a second: some $t[i,j]$ varying over a
+square. Paths-between-paths-between-paths abstract over cubes, and so
+on up the dimensions, hence `cubical' type theory.
+
+Let us start with paths between types.
+\newcommand{\tp}[1]{\frac{#1}{\;\;\;}}
+\[\begin{array}{c}
+\textsc{chk-typ}\;
+\Rule{\star\le\star'\quad \star \ni S\quad\star\ni T}
+     {\star' \ni S\tp{\star}T}
+\\
+\textsc{chk-typ-lam}\;
+\Rule{\bar i\vdash \star \ni P[i]\quad S\jq P[\pl]\quad P[\pr]\jq T}
+     {S\tp{\star}T \ni \lambda i.\,P[i]}
+\end{array}\]
+Note that the interval between $\pl$ and $\pr$ is not a type, so the
+binding in context $\bar i$ is of a different form. We shall need a
+separate judgment for \emph{points}.
+\newcommand{\pt}[1]{\textsc{pt}\;#1}
+\[
+\textsc{pt-$\pl$}\;\Axiom{\pt\pl}\qquad 
+\textsc{pt-$\pr$}\;\Axiom{\pt\pr}\qquad
+\textsc{pt-var}\;\Rule{\dashv \bar i}
+                      {\pt i}
+\]
+Now we can explain how to project from a path at a given
+point.
+\[\begin{array}{c}
+\textsc{syn-typ-app}\;
+\Rule{E\in S\tp{\star}T\quad \pt p}
+     {E\:p\in\star}
+\\
+\textsc{red-typ-$\beta$}\;
+(\lambda i.\,P[i]:S\tp{\star}T)\:p\leadsto P[p]:\star
+\end{array}\]
+
+It is usual to add further computation rules, allowing projection
+of \emph{endpoints}, necessitating type reconstruction.
+\[\begin{array}{c}
+\textsc{red-typ-$\pl$?}\;
+  E\in S\tp\star T \;\Rightarrow\; E\:\pl\leadsto S\hb\star\\
+\textsc{red-typ-$\pr$?}\;
+  E\in S\tp\star T \;\Rightarrow\; E\:\pr\leadsto T\hb\star\\
+\end{array}\]
+The critical pairs with $\beta$ induced by these rules are
+guaranteed to be resolvable, given that the construction of canonical
+paths enforces coincidence with the endpoints stated in the type.
 
 %\appendix
 %\section{Appendix Title}
