@@ -42,12 +42,12 @@ module Syntax(
   pattern Sg,
   pattern Fst,
   pattern Snd,
-  pattern Seg,
+--  pattern Seg,
   pattern Point,
-  pattern Lft,
-  pattern Rht,
-  pattern Dash,
-  pattern Weld,
+--  pattern Lft,
+--  pattern Rht,
+--  pattern Dash,
+--  pattern Weld,
   pattern One,
   pattern Path,
   pattern At,
@@ -83,6 +83,8 @@ data WMaybe (f :: World -> *)(w :: World) where
 
 data Phase = Syn Nat | Sem
 
+-- these two lines are enough to make ghci crash in ghc 8.0.1
+-- https://ghc.haskell.org/trac/ghc/ticket/12007
 pattern N = Atom ""
 pattern Kind = Atom "Kind" :& N
 
@@ -93,22 +95,22 @@ pattern Ze = Atom "zero" :& N
 pattern Su n = Atom "suc" :& n :& N
 pattern Set l = Atom "Set" :& l :& N
 
-pattern Seg = Atom "Seg" :& N
-pattern Dash = Atom "-" :& N
-pattern Point s = Atom "Point" :& s :& N
-pattern Weld sig _T tau = Atom "Weld" :& sig :& _T :& tau :& N
-pattern Lft sig = Atom "Left" :& sig :& N
-pattern Rht sig = Atom "Right" :& sig :& N
+--pattern Seg = Atom "Seg" :& N
+--pattern Dash = Atom "-" :& N
+pattern Point = Atom "Point" :& N
+--pattern Weld sig _T tau = Atom "Weld" :& sig :& _T :& tau :& N
+--pattern Lft sig = Atom "Left" :& sig :& N
+--pattern Rht sig = Atom "Right" :& sig :& N
 pattern One = Atom "one" :& N
-pattern Op = Atom "Op" :& N
-pattern Path _S sig _T = Atom "Path" :& _S :& sig :& _T :& N
-pattern At p = Atom "@" :& p :& N
-pattern Kink _S sig _T tau _U _P _Q =
-  Atom "Kink" :& _S :& sig :& _T :& tau :& _U :& _P :& _Q :& N
+pattern PCase q r = Atom "PCase" :& q :& r :& N
+--pattern Op = Atom "Op" :& N
+pattern Path _S _T = Atom "Path" :& _S :& _T :& N
+pattern At p = Atom "@" :& p :& N -- why did we need this again?
+--pattern Kink _S sig _T tau _U _P _Q =
+--  Atom "Kink" :& _S :& sig :& _T :& tau :& _U :& _P :& _Q :& N
 
-pattern Cons _P _T seq = Atom "Cons" :& _P :& _T :& seq
-pattern EndOf seq _T = Atom "EndOf" :& seq :& _T :& N
-
+--pattern Cons _P _T seq = Atom "Cons" :& _P :& _T :& seq
+--pattern EndOf seq _T = Atom "EndOf" :& seq :& _T :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -390,24 +392,33 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 
 -- given a thing and an action on it, what kind of thing do you get back?
 (/:) :: Worldly w => THING w -> Val w -> Kind w
-(_   :::: El (Pi dom cod))     /: v   = El (cod / (v :::: El dom))
-(_   :::: El (Sg dom cod))     /: Fst = El dom
-p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
-(_   :::: El (Path _S sig _T)) /: At p = Type
-(_   :::: Point sig)           /: Op   = Point (invseg sig)
-(_   :::: Point _)             /: path = Type
+(_   :::: El (Pi dom cod)) /: v   = El (cod / (v :::: El dom))
+(_   :::: El (Sg dom cod)) /: Fst = El dom
+p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
+(_   :::: El (Path _S _T)) /: At p = Type -- why the At?
+(_ :::: Point)             /: PCase _ _ = Point
+--(_   :::: Point sig)           /: Op   = Point (invseg sig)
+--(_   :::: Point)           /: path = Type 
+
 -- given a thing and an action on it, what value do you get back?
 (/-) :: Worldly w => THING w -> Val w -> Val w
 (Lam s    :::: El (Pi dom cod ))    /- v    = s / (v :::: El dom)
 ((v :& w) :::: _               )    /- Fst  = v
 ((v :& w) :::: _               )    /- Snd  = w
+(Ze  :::: Point) /- PCase q _ = q
+(One :::: Point) /- PCase _ r = r
+
+
 
 -- a point acts on a path
+{-
 (_     :::: El path@(Path _S sig _T)) /- At p
   | Just _X <- canonPoint path p = _X
-(Lam _M   :::: El (Path _S sig _T)) /- At p = _M / (p :::: Point sig)
+-}
+(Lam _M   :::: El (Path _S _T)) /- At p = _M / (p :::: Point)
 
 -- inverting points
+{-
 (Ze    :::: Point _                ) /- Op = One
 (Lft p :::: Point (Weld sig _T tau)) /- Op = Rht ((p :::: Point sig) /- Op)
 (Rht p :::: Point (Weld sig _T tau)) /- Op = Lft ((p :::: Point tau) /- Op)
@@ -444,8 +455,11 @@ p@(_ :::: El (Sg dom cod))     /: Snd = El (cod / (p /- Fst :::: El dom))
 (En  n    :::: Point _         )    /- EndOf _SPs _U =
   let (_SPs' :< _U') = process (En n) B0 (atomList2List _SPs ++ [_U])
   in  En (n :/ EndOf (list2atomList (_SPs' <>>[])) _U')
+-}
+
 (En n     :::: _               )    /- v    = En (n :/ v)
 
+{-
 process :: Val w
         -> Bwd (Val w)
         -> [Val w]
@@ -538,7 +552,7 @@ focusL (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) = val (Lam $ (Decl,Point s
 
 focusR :: Worldly w => THING w -> THING w
 focusR (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) = val (Lam $ (Decl,Point sig1) !- \ (i :: Ref w') -> etaquote (wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T))  / At (Rht (En (P i) :: Val w')))) :::: El (Path _S' sig1 _T)
-
+-}
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
 (//) :: (w <= w', VarOperable t)
@@ -602,8 +616,9 @@ etaquote f@(_        :::: El (Pi dom cod)) = Lam $
   (Decl,El dom) !- \ x -> etaquote (wk f / x)
 etaquote p@(_        :::: El (Sg dom cod)) =
   etaquote (p / "Fst") :& etaquote (p / "Snd")
-etaquote (Ze         :::: Point seg      ) = Ze
-etaquote (One        :::: Point seg      ) = One
+etaquote (Ze         :::: Point       ) = Ze
+etaquote (One        :::: Point       ) = One
+{-
 etaquote (Lft p     :::: Point (Weld sig _ _)) = 
   case etaquote (p :::: Point sig) of
     Ze -> Ze
@@ -613,8 +628,9 @@ etaquote (Rht p    :::: Point (Weld _ _ tau)) =
   case etaquote (p :::: Point tau) of
     One -> One
     p   -> Rht p
-etaquote _Q@(_ :::: Path _S seg _T) = Lam $
-  (Decl,Point seg) !- \ (x :: Ref w') -> 
+-}
+etaquote _Q@(_ :::: Path _S _T) = Lam $
+  (Decl,Point) !- \ (x :: Ref w') -> 
     etaquote (wk _Q / (At (En (P x)) :: Val w'))
 
 etaquote (En e       :::: _              ) = En  (fst (netaquote e))
@@ -634,7 +650,10 @@ netaquote (e :/ s)    =
     (El (Pi dom cod), s)   -> e' :/ etaquote (s :::: El dom)
     (El (Sg dom cod), Fst) -> e' :/ Fst
     (El (Sg dom cod), Snd) -> e' :/ Snd
-    (El (Path _S seg _T), At p) -> e' :/ At (etaquote (p :::: Point seg))
+    (El (Path _S _T), At p) -> e' :/ At (etaquote (p :::: Point))
+    (Point, PCase q r) ->
+      e' :/ PCase (etaquote (q :::: Point)) (etaquote (r :::: Point))
+{-    
     (Point _, Kink _S sig _T tau _U _P _Q) -> e' :/ Kink
       (etaquote (_S  :::: Type))
       (etaquote (sig :::: Seg))
@@ -642,9 +661,10 @@ netaquote (e :/ s)    =
       (etaquote (tau :::: Seg))
       (etaquote (_U  :::: Type))
       (etaquote (_P  :::: El (Path _S sig _T)))
-      (etaquote (_Q  :::: El (Path _T tau _U)))
+      (etaquote (_Q  :::: El (Path _T tau _U))) -}
   where
   (e' , ty) = netaquote e
+
 netaquote (glob :% g) = (glob :% emap etaquote g', eval (wk t) g')
   where
   del :=> t = globArity glob
