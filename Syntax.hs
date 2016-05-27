@@ -42,12 +42,7 @@ module Syntax(
   pattern Sg,
   pattern Fst,
   pattern Snd,
---  pattern Seg,
   pattern Point,
---  pattern Lft,
---  pattern Rht,
---  pattern Dash,
---  pattern Weld,
   pattern One,
   pattern Path,
   pattern At,
@@ -95,22 +90,15 @@ pattern Ze = Atom "zero" :& N
 pattern Su n = Atom "suc" :& n :& N
 pattern Set l = Atom "Set" :& l :& N
 
---pattern Seg = Atom "Seg" :& N
---pattern Dash = Atom "-" :& N
 pattern Point = Atom "Point" :& N
---pattern Weld sig _T tau = Atom "Weld" :& sig :& _T :& tau :& N
---pattern Lft sig = Atom "Left" :& sig :& N
---pattern Rht sig = Atom "Right" :& sig :& N
 pattern One = Atom "one" :& N
 pattern PCase q r = Atom "PCase" :& q :& r :& N
---pattern Op = Atom "Op" :& N
 pattern Path _S _T = Atom "Path" :& _S :& _T :& N
+pattern PComp _Q _Q' = Atom "PComp" :& _Q :& _Q' :& N
+pattern Coe p a q = Atom "Coe" :& p :& a :& q :& N
+  -- an eliminator for paths, take a point, a term at that point, and
+  -- another point to pull it to
 pattern At p = Atom "@" :& p :& N -- why did we need this again?
---pattern Kink _S sig _T tau _U _P _Q =
---  Atom "Kink" :& _S :& sig :& _T :& tau :& _U :& _P :& _Q :& N
-
---pattern Cons _P _T seq = Atom "Cons" :& _P :& _T :& seq
---pattern EndOf seq _T = Atom "EndOf" :& seq :& _T :& N
 
 type TERM = Tm (Syn Zero)
 type ELIM = En (Syn Zero)
@@ -339,6 +327,7 @@ type family WorldLT (w :: World)(w' :: World) :: Bool where
 type family WorldLE (w :: World)(w' :: World) :: Bool where
   WorldLE w w' = OR (EQ w w') (WorldLT w w')
 
+-- propagate
 type u <= v = WorldLE u v ~ True
 
 refThing :: Ref w -> THING w
@@ -392,167 +381,51 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 
 -- given a thing and an action on it, what kind of thing do you get back?
 (/:) :: Worldly w => THING w -> Val w -> Kind w
-(_   :::: El (Pi dom cod)) /: v   = El (cod / (v :::: El dom))
-(_   :::: El (Sg dom cod)) /: Fst = El dom
-p@(_ :::: El (Sg dom cod)) /: Snd = El (cod / (p /- Fst :::: El dom))
-(_   :::: El (Path _S _T)) /: At p = Type -- why the At?
-(_ :::: Point)             /: PCase _ _ = Point
---(_   :::: Point sig)           /: Op   = Point (invseg sig)
---(_   :::: Point)           /: path = Type 
+(_   :::: El (Pi dom cod))  /: v   = El (cod / (v :::: El dom))
+(_   :::: El (Sg dom cod))  /: Fst = El dom
+p@(_ :::: El (Sg dom cod))  /: Snd = El (cod / (p /- Fst :::: El dom))
+(_   :::: El (Path _S _T))  /: At p = Type
+_Q@(_ :::: El (Path _S _T)) /: Coe p a q = _Q /- q
+(_ :::: Point)              /: PCase _ _ = Point
 
 -- given a thing and an action on it, what value do you get back?
-(/-) :: Worldly w => THING w -> Val w -> Val w
+(/-) :: forall w. Worldly w => THING w -> Val w -> Val w
 (Lam s    :::: El (Pi dom cod ))    /- v    = s / (v :::: El dom)
 ((v :& w) :::: _               )    /- Fst  = v
 ((v :& w) :::: _               )    /- Snd  = w
 (Ze  :::: Point) /- PCase q _ = q
 (One :::: Point) /- PCase _ r = r
 
+(Lam _M         :::: El (Path _S _T))  /- At p = _M / (p :::: Point)
+(_Q             :::: El (Path _S _T))  /- Coe Ze  a Ze = a
+(_Q             :::: El (Path _S _T))  /- Coe One a One = a
+_Q@(_ :::: El (Path _X0 _X1)) /- Coe p a q = 
+  case (_X0,blah _Q,_X1) of
+    (Pi _S0 _T0, Pi _Si _Ti, Pi _S1 _T1) ->
+      let _QS = val (Lam _Si) :::: El (Path _S0 _S1)
+      in  val $ Lam $ (Decl,eval (wk _Si) (ES E0 (q :::: Point))) !- \ (sq :: Ref w') ->
+        let sS :: Kr Val THING w'
+            sS = Kr $ \ i -> wk (wk _QS :: THING w') / Coe (wk (wk q :: Val w')) (wk (En (P sq))) i
+            _QT :: THING w'
+            _QT = val (Lam $ (Decl,Point) !- \ i ->
+                       etaquote
+                         (eval (wk (wk _Ti :: Tm (Syn (Suc One)) w'))
+                            (ES (ES E0 (refThing i)) (kr sS (En (P i))))
+                          :::: Type))
+                  ::::
+                  El (Path (wk _T0 / (kr sS (Ze :: Val w')))
+                           (wk _T1 / (kr sS (One :: Val w'))))
+            t :: Val w'
+            t = wk (a :::: (_Q /- At p)) /- valOf (kr sS (wk p))
+        in  etaquote (_QT / Coe (wk p) t (wk q))
+(En n           :::: _               ) /- v    = En (n :/ v)
 
+newtype Kr s t u = Kr {kr :: forall v. (Worldly v, u <= v) => s v -> t v}
+instance Weakenable (Kr s t)
 
--- a point acts on a path
-{-
-(_     :::: El path@(Path _S sig _T)) /- At p
-  | Just _X <- canonPoint path p = _X
--}
-(Lam _M   :::: El (Path _S _T)) /- At p = _M / (p :::: Point)
+blah :: Worldly w => THING w -> Tm (Syn One) w
+blah x = (Decl, Point) !- \ i -> etaquote (wk x / i)
 
--- inverting points
-{-
-(Ze    :::: Point _                ) /- Op = One
-(Lft p :::: Point (Weld sig _T tau)) /- Op = Rht ((p :::: Point sig) /- Op)
-(Rht p :::: Point (Weld sig _T tau)) /- Op = Lft ((p :::: Point tau) /- Op)
-(One   :::: Point _                ) /- Op = Ze
--- a path acts on a point
-(Ze  :::: Point _) /-  Kink _S sig _T tau _U _P _Q = _S
-(Lft p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
-  (_P :::: El (Path _S sig _T)) /- At p
-(Rht p :::: Point _) /- Kink _S sig _T tau _U _P _Q =
-  (_Q :::: El (Path _T sig _U)) /- At p
-(One :::: Point _) /- Kink _S sig _T tau _U _P _Q = _U
-(En (p :/ Op) :::: Point seg) /- Kink _S sig _T tau _U _P _Q = 
-  (En p :::: Point (invseg seg)) /- Kink
-    _U
-    (invseg tau)
-    _T
-    (invseg sig)
-    _S
-    (flipPath (_P :::: El (Path _S sig _T)))
-    (flipPath (_Q :::: El (Path _T tau _U)))
---x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q)
---  | Just _X <- yankLeft x y = _X
---x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q)
---  | Just _X <- yankRight x y = _X
--- x@(p :::: Point Dash) /- y@(Kink _S sig _T tau _U _P _Q)
---  | Just _X <- shuffle x y = _X
-(p :::: Point Dash) /- Kink _S sig _T tau _U _P _Q =
-  (p :::: Point Dash) /- EndOf (Cons _S _P (Cons _T _Q N)) _U
-(_   :::: Point _) /- EndOf N _T = _T
-(Ze  :::: Point _) /- EndOf (Cons _S _P _) _  = _S
-(One :::: Point _) /- EndOf (Cons _ _ _)   _S = _S
-(En (p :/ Op) :::: Point seg) /- EndOf _SPs _U = 
-  (En p :::: Point (invseg seg)) /- invEndOf _SPs _U
-(En  n    :::: Point _         )    /- EndOf _SPs _U =
-  let (_SPs' :< _U') = process (En n) B0 (atomList2List _SPs ++ [_U])
-  in  En (n :/ EndOf (list2atomList (_SPs' <>>[])) _U')
--}
-
-(En n     :::: _               )    /- v    = En (n :/ v)
-
-{-
-process :: Val w
-        -> Bwd (Val w)
-        -> [Val w]
-        -> Bwd (Val w)
-process i _SPs [] = _SPs
-
-process i (_SPs :< _T) (_Q : _U : _RVs) =
-  {- if Type `ni` Qi == T then process i _SPs _T  _RVs
-  else if Q i `reducesTo` i endOf T _QUs then
-    process i _(SPs :< _T) (_QUs ++ _RVs)
-  else -} process i (_SPs :< _T :< _Q  :< _U) _RVs
-
-                                 
-invEndOf  :: Val w -> Val w -> Val w
-invEndOf _SPs _U = list2atomList (_U : (reverse (atomList2List _SPs)))
-
-atomList2List :: Val w -> [Val w]
-atomList2List (Cons _S _P _SPs) = _S : _P : atomList2List _SPs
-atomList2List N                 = []
-
-list2atomList :: [Val w] -> Val w
-list2atomList []           = N
-list2atomList (_S:_P:_SPs) = Cons _S _P (list2atomList _SPs)
-
-canonPoint :: Val w -> Val w -> Maybe (Val w)
-canonPoint (Path _S sig _T) Ze  = Just _S
-canonPoint (Path _S (Weld sig _M tau) _T) (Lft p) =
-  canonPoint (Path _S sig _M) p
-canonPoint (Path _S (Weld sig _M tau) _T) (Rht p) =
-  canonPoint (Path _M tau _T) p
-canonPoint (Path _S sig _T) One = Just _T
--- no case for Op as it would have already computed away if the point
--- was canonical
-
-invseg :: Tm p w -> Tm p w
-invseg Dash = Dash
-invseg (Weld sig _M tau) = Weld (invseg tau) _M (invseg sig)
-
-flipPath :: Worldly w => THING w -> Val w
-flipPath p@(_P :::: El (Path _S sig _T)) =
-  val $ Lam $ (Decl,Point Dash :: Val w) !- \ (i :: Ref w') -> etaquote (wk p / At ((refThing i /- Op) :: Val w'))
-
-yankLeft :: Worldly w => THING w -> Val w -> Maybe (Val w)
-yankLeft (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
-  case ((Decl,(Point Dash :: Val w)) !- \ i -> kEq' Type (wk _S) (wk (_P :::: El (Path _S sig _T)) /- At (En (P i)))) of
-    Cheer -> Just $ (_Q :::: El (Path _T tau _U)) /- At p
-    Fear  -> Nothing
-yankLeft _ _ = Nothing -- not a dash seg
-
-yankRight :: Worldly w => THING w -> Val w -> Maybe (Val w)
-yankRight (p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) =
-  case ((Decl,(Point Dash :: Val w)) !- \ i -> kEq' Type (wk (_Q :::: El (Path _T tau _U)) /- At (En (P i))) (wk _U)) of
-    Cheer -> Just $ (_P :::: El (Path _S sig _T)) /- At p
-    Fear  -> Nothing
-yankRight _ _ = Nothing -- not a dash seg
-  
-shuffle :: Worldly w => THING w -> Val w -> Maybe (Val w)
-shuffle thing@(p :::: (Point Dash :: Val w)) (Kink _S sig _T tau _U _P _Q) = case help thing of
-  WJust (W5Tuple (sig0,_S',sig1,_P0,_P1)) -> Just $ thing /- Kink
-    _S
-    (val1 sig0)
-    (val1 _S')
-    (Weld (val1 sig1) _T tau)
-    _U
-    (val1 _P0)
-    (val (Lam (En (V FZero :/ Kink
-       _S'
-       sig1
-       (vclosed (etaquote (_T :::: Type)))
-       (vclosed (etaquote (tau :::: Seg)))
-       (vclosed (etaquote (_U :::: Type)))
-       _P1
-       (vclosed (etaquote (_Q :::: El (Path _T tau _U))))))))
-  _ -> Nothing
-  where
-  val1 t = eval t (ES E0 thing)
-  help :: Worldly w => THING w -> WMaybe (W5Tuple (Tm (Syn One))) w
-  help p = 
-     (Decl,Point Dash) !- \(i :: Ref w') -> case wk p /- At (En (P i) :: Val w') of
-      En (P i :/ Kink _S sig0 _S' sig1 _T _P0 _P1) -> WJust $ W5Tuple
-        (etaquote (sig0 :::: Seg),
-         etaquote (_S' :::: Type),
-         etaquote (sig1 :::: Seg),
-         etaquote (_P0 :::: El (Path _S sig0 _S')),
-         etaquote (_P1 :::: El (Path _S' sig1 _T)))
-      _ -> WNothing
-
-focusL :: Worldly w => THING w -> THING w
-focusL (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) = val (Lam $ (Decl,Point sig0) !- \ (i :: Ref w') -> etaquote (wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T))  / At (Lft (En (P i) :: Val w')))) :::: El (Path _S sig0 _S')
-
-focusR :: Worldly w => THING w -> THING w
-focusR (_P :::: El (Path _S (Weld sig0 _S' sig1) _T)) = val (Lam $ (Decl,Point sig1) !- \ (i :: Ref w') -> etaquote (wk (_P :::: El (Path _S (Weld sig0 _S' sig1) _T))  / At (Rht (En (P i) :: Val w')))) :::: El (Path _S' sig1 _T)
--}
 -- can't replace with (probably several) Act instance(s)
 -- due to fundep (w does not determine w')
 (//) :: (w <= w', VarOperable t)
@@ -618,17 +491,6 @@ etaquote p@(_        :::: El (Sg dom cod)) =
   etaquote (p / "Fst") :& etaquote (p / "Snd")
 etaquote (Ze         :::: Point       ) = Ze
 etaquote (One        :::: Point       ) = One
-{-
-etaquote (Lft p     :::: Point (Weld sig _ _)) = 
-  case etaquote (p :::: Point sig) of
-    Ze -> Ze
-    One -> Rht Ze -- if you're in the middle you're on the right :)
-    p   -> Lft p
-etaquote (Rht p    :::: Point (Weld _ _ tau)) = 
-  case etaquote (p :::: Point tau) of
-    One -> One
-    p   -> Rht p
--}
 etaquote _Q@(_ :::: Path _S _T) = Lam $
   (Decl,Point) !- \ (x :: Ref w') -> 
     etaquote (wk _Q / (At (En (P x)) :: Val w'))
@@ -653,15 +515,6 @@ netaquote (e :/ s)    =
     (El (Path _S _T), At p) -> e' :/ At (etaquote (p :::: Point))
     (Point, PCase q r) ->
       e' :/ PCase (etaquote (q :::: Point)) (etaquote (r :::: Point))
-{-    
-    (Point _, Kink _S sig _T tau _U _P _Q) -> e' :/ Kink
-      (etaquote (_S  :::: Type))
-      (etaquote (sig :::: Seg))
-      (etaquote (_T  :::: Type))
-      (etaquote (tau :::: Seg))
-      (etaquote (_U  :::: Type))
-      (etaquote (_P  :::: El (Path _S sig _T)))
-      (etaquote (_Q  :::: El (Path _T tau _U))) -}
   where
   (e' , ty) = netaquote e
 
