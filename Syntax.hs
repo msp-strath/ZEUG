@@ -413,11 +413,30 @@ _Q@(_ :::: El (Path _X0 _X1)) /- Coe p a q =
                             (ES (ES E0 (refThing i)) (kr sS (En (P i))))
                           :::: Type))
                   ::::
-                  El (Path (wk _T0 / (kr sS (Ze :: Val w')))
-                           (wk _T1 / (kr sS (One :: Val w'))))
+                  El (Path (wk _T0 / (kr sS (Ze :: Val w'))) -- Ze or p?
+                           (wk _T1 / (kr sS (One :: Val w')))) -- One or q?
             t :: Val w'
             t = wk (a :::: (_Q /- At p)) /- valOf (kr sS (wk p))
         in  etaquote (_QT / Coe (wk p) t (wk q))
+    (Sg _S0 _T0, Sg _Si _Ti, Pi _S1 _T1) ->
+      let _QS = val (Lam _Si) :::: El (Path _S0 _S1)
+          sS :: Kr Val THING w
+          sS = Kr $ \i ->
+            wk _QS / Coe (wk p) ((wk a :::: Sg (wk _S0) (wk _T0)) /- Fst) i
+          _QT :: THING w
+          _QT = val (Lam $ (Decl,Point) !- \ i ->
+                      etaquote
+                        (eval (wk _Ti)
+                          (ES (ES E0 (refThing i)) (kr sS (En (P i))))
+                        :::: Type))
+                ::::
+                El (Path (_T0 / kr sS (Ze :: Val w)) -- Ze or p?
+                         (_T1 / (kr sS (One :: Val w)))) -- One or q?
+          tT :: Kr Val THING w
+          tT = Kr $ \i -> 
+            wk _QT / Coe (wk p) ((wk a :::: Sg (wk _S0) (wk _T0)) /- Snd) i
+      in  valOf (kr sS q) :& valOf (kr tT q)
+    _ -> undefined
 (En n           :::: _               ) /- v    = En (n :/ v)
 
 newtype Kr s t u = Kr {kr :: forall v. (Worldly v, u <= v) => s v -> t v}
