@@ -418,14 +418,14 @@ _Q@(_ :::: El (Path _X0 _X1)) /- Coe p a q =
             t :: Val w'
             t = wk (a :::: (_Q /- At p)) /- valOf (kr sS (wk p))
         in  etaquote (_QT / Coe (wk p) t (wk q))
-    (Sg _S0 _T0, Sg _Si _Ti, Pi _S1 _T1) ->
+    (Sg _S0 _T0, Sg _Si _Ti, Sg _S1 _T1) ->
       let _QS = val (Lam _Si) :::: El (Path _S0 _S1)
           sS :: Kr Val THING w
           sS = Kr $ \i ->
             wk _QS / Coe (wk p) ((wk a :::: Sg (wk _S0) (wk _T0)) /- Fst) i
           _QT :: THING w
           _QT = val (Lam $ (Decl,Point) !- \ i ->
-                      etaquote
+                       etaquote
                         (eval (wk _Ti)
                           (ES (ES E0 (refThing i)) (kr sS (En (P i))))
                         :::: Type))
@@ -436,6 +436,13 @@ _Q@(_ :::: El (Path _X0 _X1)) /- Coe p a q =
           tT = Kr $ \i -> 
             wk _QT / Coe (wk p) ((wk a :::: Sg (wk _S0) (wk _T0)) /- Snd) i
       in  valOf (kr sS q) :& valOf (kr tT q)
+    (Path _S0 _T0, Path _Si _Ti, Path _S1 _T1) ->
+      let _SPath :: Val w
+          _SPath = val (Lam $ (Decl,Point) !- \ (i :: Ref w') ->
+                         etaquote
+                           (eval (wk _Si) (ES E0 (refThing i / PCase (One :: Val w') Ze)) :::: Type))
+          _TPath = val (Lam _Ti) :::: El (Path _T0 _T1)
+      in  PComp (PComp _SPath (valOf _Q)) (valOf _TPath)
     _ -> undefined
 (En n           :::: _               ) /- v    = En (n :/ v)
 
