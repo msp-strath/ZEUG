@@ -96,8 +96,9 @@ pattern PCase q r = Atom "PCase" :& q :& r :& N
 pattern Path _S _T = Atom "Path" :& _S :& _T :& N
 pattern PComp _Q _T _Q' = Atom "PComp" :& _Q :& _T :& _Q' :& N
 pattern Coe p a q = Atom "Coe" :& p :& a :& q :& N
-pattern Coe0 a q = Atom "Coe" :& a :& q :& N
-pattern Coe1 a q = Atom "Coe" :& a :& q :& N
+pattern Src q _S _T _Q a = Atom "Src" :& q :& _S :& _T :& _Q :& a :& N
+pattern Trg0 _S _T _Q a = Atom "Trg0" :& _S :& _T :& _Q :& a :& N
+pattern Trg1 _S _T _Q a = Atom "Trg1" :& _S :& _T :& _Q :& a :& N
 pattern Coe01 a = Atom "Coe" :& a :& N
 pattern Coe10 a = Atom "Coe" :& a :& N
 
@@ -391,10 +392,11 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 p@(_ :::: El (Sg dom cod))  /: Snd = El (cod / (p /- Fst :::: El dom))
 (_   :::: El (Path _S _T))  /: At p = Type
 _Q@(_ :::: El (Path _S _T)) /: Coe p a q = _Q /- q
-_Q@(_ :::: El (Path _S _T)) /: Coe0  a q = _Q /- q
-_Q@(_ :::: El (Path _S _T)) /: Coe1  a q = _Q /- q
 _Q@(_ :::: El (Path _S _T)) /: Coe01 a   = _Q /- One
 _Q@(_ :::: El (Path _S _T)) /: Coe10 a   = _Q /- Ze
+(_ :::: Point)              /: Src q _S _T _Q a = Type
+(_ :::: Point)              /: Trg0 _S _T _Q a = Type
+(_ :::: Point)              /: Trg1 _S _T _Q a = Type
 
 (_ :::: Point)              /: PCase _ _ = Point
 
@@ -406,13 +408,15 @@ _Q@(_ :::: El (Path _S _T)) /: Coe10 a   = _Q /- Ze
 (Ze  :::: Point) /- PCase q _ = q
 (One :::: Point) /- PCase _ r = r
 
+(Ze   :::: Point) /- Src q _S _T _Q a = (q :::: Point) /- Trg0 _S _T _Q a
+(One  :::: Point) /- Src q _S _T _Q a = (q :::: Point) /- Trg1 _S _T _Q a
+(Ze   :::: Point) /- Trg0 _S _T _Q a = a
+(One  :::: Point) /- Trg0 _S _T _Q a = (_Q :::: El (Path _S _T)) /- Coe10 a
+(Ze   :::: Point) /- Trg1 _S _T _Q a = (_Q :::: El (Path _S _T)) /- Coe01 a
+(One  :::: Point) /- Trg1 _S _T _Q a = a
+
 (Lam _M          :::: El (Path _S _T)) /- At p = _M / (p :::: Point)
-_Q@(_            :::: El (Path _S _T)) /- Coe Ze  a q   = _Q /- Coe0 a q
-_Q@(_            :::: El (Path _S _T)) /- Coe One a q   = _Q /- Coe1 a q
-(_Q              :::: El (Path _S _T)) /- Coe0    a Ze  = a
-_Q@(_            :::: El (Path _S _T)) /- Coe0    a One = _Q /- Coe01 a
-_Q@(_            :::: El (Path _S _T)) /- Coe1    a Ze  = _Q /- Coe10 a
-(_Q              :::: El (Path _S _T)) /- Coe1    a One = a
+(_Q              :::: El (Path _S _T)) /- Coe p   a q   = (p :::: Point) /- Src q _S _T _Q a
 (PComp _Q _T _Q' :::: El (Path _S _U)) /- Coe01   a =
   (_Q' :::: El (Path _T _U)) /- Coe Ze ((_Q :::: El (Path _S _T)) /- Coe Ze a One) One
 _Q@(_ :::: El (Path _X0 _X1)) /- Coe01 a = 
