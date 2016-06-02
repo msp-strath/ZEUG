@@ -94,8 +94,13 @@ pattern Point = Atom "Point" :& N
 pattern One = Atom "one" :& N
 pattern PCase q r = Atom "PCase" :& q :& r :& N
 pattern Path _S _T = Atom "Path" :& _S :& _T :& N
-pattern PComp _Q _Q' = Atom "PComp" :& _Q :& _Q' :& N
+pattern PComp _Q _T _Q' = Atom "PComp" :& _Q :& _T :& _Q' :& N
 pattern Coe p a q = Atom "Coe" :& p :& a :& q :& N
+pattern Coe0 a q = Atom "Coe" :& a :& q :& N
+pattern Coe1 a q = Atom "Coe" :& a :& q :& N
+pattern Coe01 a = Atom "Coe" :& a :& N
+pattern Coe10 a = Atom "Coe" :& a :& N
+
   -- an eliminator for paths, take a point, a term at that point, and
   -- another point to pull it to
 pattern At p = Atom "@" :& p :& N -- why did we need this again?
@@ -386,6 +391,11 @@ instance Worldly w => Act (Scope w) (Ref w) (Val w) where
 p@(_ :::: El (Sg dom cod))  /: Snd = El (cod / (p /- Fst :::: El dom))
 (_   :::: El (Path _S _T))  /: At p = Type
 _Q@(_ :::: El (Path _S _T)) /: Coe p a q = _Q /- q
+_Q@(_ :::: El (Path _S _T)) /: Coe0  a q = _Q /- q
+_Q@(_ :::: El (Path _S _T)) /: Coe1  a q = _Q /- q
+_Q@(_ :::: El (Path _S _T)) /: Coe01 a   = _Q /- One
+_Q@(_ :::: El (Path _S _T)) /: Coe10 a   = _Q /- Ze
+
 (_ :::: Point)              /: PCase _ _ = Point
 
 -- given a thing and an action on it, what value do you get back?
@@ -396,16 +406,22 @@ _Q@(_ :::: El (Path _S _T)) /: Coe p a q = _Q /- q
 (Ze  :::: Point) /- PCase q _ = q
 (One :::: Point) /- PCase _ r = r
 
-(Lam _M         :::: El (Path _S _T))  /- At p = _M / (p :::: Point)
-(_Q             :::: El (Path _S _T))  /- Coe Ze  a Ze = a
-(_Q             :::: El (Path _S _T))  /- Coe One a One = a
-_Q@(_ :::: El (Path _X0 _X1)) /- Coe p a q = 
+(Lam _M          :::: El (Path _S _T)) /- At p = _M / (p :::: Point)
+_Q@(_            :::: El (Path _S _T)) /- Coe Ze  a q   = _Q /- Coe0 a q
+_Q@(_            :::: El (Path _S _T)) /- Coe One a q   = _Q /- Coe1 a q
+(_Q              :::: El (Path _S _T)) /- Coe0    a Ze  = a
+_Q@(_            :::: El (Path _S _T)) /- Coe0    a One = _Q /- Coe01 a
+_Q@(_            :::: El (Path _S _T)) /- Coe1    a Ze  = _Q /- Coe10 a
+(_Q              :::: El (Path _S _T)) /- Coe1    a One = a
+(PComp _Q _T _Q' :::: El (Path _S _U)) /- Coe01   a =
+  (_Q' :::: El (Path _T _U)) /- Coe Ze ((_Q :::: El (Path _S _T)) /- Coe Ze a One) One
+_Q@(_ :::: El (Path _X0 _X1)) /- Coe01 a = 
   case (_X0,blah _Q,_X1) of
     (Pi _S0 _T0, Pi _Si _Ti, Pi _S1 _T1) ->
       let _QS = val (Lam _Si) :::: El (Path _S0 _S1)
-      in  val $ Lam $ (Decl,eval (wk _Si) (ES E0 (q :::: Point))) !- \ (sq :: Ref w') ->
+      in  val $ Lam $ (Decl,eval (wk _Si) (ES E0 (One :::: Point))) !- \ (sq :: Ref w') ->
         let sS :: Kr Val THING w'
-            sS = Kr $ \ i -> wk (wk _QS :: THING w') / Coe (wk (wk q :: Val w')) (wk (En (P sq))) i
+            sS = Kr $ \ i -> wk (wk _QS :: THING w') / Coe (wk (One :: Val w')) (wk (En (P sq))) i
             _QT :: THING w'
             _QT = val (Lam $ (Decl,Point) !- \ i ->
                        etaquote
@@ -413,16 +429,16 @@ _Q@(_ :::: El (Path _X0 _X1)) /- Coe p a q =
                             (ES (ES E0 (refThing i)) (kr sS (En (P i))))
                           :::: Type))
                   ::::
-                  El (Path (wk _T0 / (kr sS (Ze :: Val w'))) -- Ze or p?
-                           (wk _T1 / (kr sS (One :: Val w')))) -- One or q?
+                  El (Path (wk _T0 / (kr sS (Ze :: Val w')))
+                           (wk _T1 / (kr sS (One :: Val w'))))
             t :: Val w'
-            t = wk (a :::: (_Q /- At p)) /- valOf (kr sS (wk p))
-        in  etaquote (_QT / Coe (wk p) t (wk q))
+            t = wk (a :::: (_Q /- At Ze)) /- valOf (kr sS Ze)
+        in  etaquote (_QT / Coe Ze t One)
     (Sg _S0 _T0, Sg _Si _Ti, Sg _S1 _T1) ->
       let _QS = val (Lam _Si) :::: El (Path _S0 _S1)
           sS :: Kr Val THING w
           sS = Kr $ \i ->
-            wk _QS / Coe (wk p) ((wk a :::: Sg (wk _S0) (wk _T0)) /- Fst) i
+            wk _QS / Coe Ze ((wk a :::: Sg (wk _S0) (wk _T0)) /- Fst) i
           _QT :: THING w
           _QT = val (Lam $ (Decl,Point) !- \ i ->
                        etaquote
@@ -430,20 +446,21 @@ _Q@(_ :::: El (Path _X0 _X1)) /- Coe p a q =
                           (ES (ES E0 (refThing i)) (kr sS (En (P i))))
                         :::: Type))
                 ::::
-                El (Path (_T0 / kr sS (Ze :: Val w)) -- Ze or p?
-                         (_T1 / (kr sS (One :: Val w)))) -- One or q?
+                El (Path (_T0 / kr sS (Ze :: Val w))
+                         (_T1 / (kr sS (One :: Val w))))
           tT :: Kr Val THING w
           tT = Kr $ \i -> 
-            wk _QT / Coe (wk p) ((wk a :::: Sg (wk _S0) (wk _T0)) /- Snd) i
-      in  valOf (kr sS q) :& valOf (kr tT q)
+            wk _QT / Coe Ze ((wk a :::: Sg (wk _S0) (wk _T0)) /- Snd) i
+      in  valOf (kr sS One) :& valOf (kr tT One)
     (Path _S0 _T0, Path _Si _Ti, Path _S1 _T1) ->
       let _SPath :: Val w
           _SPath = val (Lam $ (Decl,Point) !- \ (i :: Ref w') ->
                          etaquote
                            (eval (wk _Si) (ES E0 (refThing i / PCase (One :: Val w') Ze)) :::: Type))
           _TPath = val (Lam _Ti) :::: El (Path _T0 _T1)
-      in  PComp (PComp _SPath (valOf _Q)) (valOf _TPath)
+      in  PComp (PComp _SPath undefined (valOf _Q)) undefined (valOf _TPath)
     _ -> undefined
+(_Q             :::: El (Path _S _T))  /- Coe10   a     = undefined
 (En n           :::: _               ) /- v    = En (n :/ v)
 
 newtype Kr s t u = Kr {kr :: forall v. (Worldly v, u <= v) => s v -> t v}
@@ -520,7 +537,6 @@ etaquote (One        :::: Point       ) = One
 etaquote _Q@(_ :::: Path _S _T) = Lam $
   (Decl,Point) !- \ (x :: Ref w') -> 
     etaquote (wk _Q / (At (En (P x)) :: Val w'))
-
 etaquote (En e       :::: _              ) = En  (fst (netaquote e))
 
 data Wibble w where
