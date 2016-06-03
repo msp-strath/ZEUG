@@ -541,31 +541,41 @@ that there are paths between pair types which are not componentwise
 paths cannot be given structurally. A rocket of pairs is a pair of
 rockets. Eliding obvious type information, we get
 \[\begin{array}{l}
-\xp{(s,t)}a{\lambda i.\,(x\hb S[i])\times T[i,x]}b \leadsto
+\xp {(s,t)} a{\lambda i.\,(x\hb S[i])\times T[i,x]}b \leadsto
   (\hat s[b], \hat t[b]):\cdots\;\;\textrm{where} \\
 \qquad\begin{array}{l}
   \hat s[j]= \xp s a {\lambda i.\,S[i]} j \\
   \hat t[j]= \xp t a {\lambda i.\,T[i,\hat s[i]]} j \\
 \end{array}
 \end{array}\]
-That is, we construct $\hat s$ and $\hat t$, being the images of $s$,
+If we have $\eta$ for pairs, then pattern matching a pair
+means pattern matching its expansion, i.e., projecting components,
+rather than waiting for the constructor.
+Observe that we construct $\hat s$ and $\hat t$, being the images of $s$,
 and $t$ over the entire path. Moreover, we need the full generality of
 $\hat s$ to give the path over which $t$ can rocket. Note that $\hat
 s[s]$ is just $s$ by the \textsc{go-stop} rule, so $t$ has the
-correct type for its rocket.
+correct type for its rocket. We must also check critical pairs: if
+$b$ is $a$, then we do indeed get $(s,t)$ back; if the whole path is
+degenerate, then so is its $S[\_]$ component, which makes $\hat s$ a
+constant $s$, and the second component path also degenerate $T[\_,s]$.
 
 For dependent functions, we rocket back and forth.
 \[\begin{array}{l}
-\xp{r}a{\lambda i.\,(x\hb S[i])\to T[i,x]}b \leadsto
+\xp{(\lambda x.\:t[x])}a{\lambda i.\,(x\hb S[i])\to T[i,x]}b \leadsto
   \lambda x.\, \hat t[b]:\cdots\;\;\textrm{where} \\
 \qquad\begin{array}{l}
   \hat s[j]= \xp x b {\lambda i.\,S[i]} j \\
-  \hat t[j]= \xp {(r\hb\cdots) (\hat s[a])} a {\lambda i.\,T[i,\hat s[i]]} j \\
+  \hat t[j]= \xp {(t[\hat s[a]]} a {\lambda i.\,T[i,\hat s[i]]} j \\
 \end{array}
 \end{array}\]
-We can readily check that $r$ (which comes from the $a$ side) gets an
-argument it can use, and that the eventual output (on the $b$ side),
-has type $T[b,\hat s[b]] = T[b,x]$, again by the \textsc{go-stop} rule.
+As before, if we have $\eta$ for functions, then the $\lambda$-pattern
+forces expansion. We can readily check that $r$ (which comes from the
+$a$ side) gets an argument it can use, and that the eventual output (on the $b$ side),
+has the required type $T[b,\hat s[b]] = T[b,x]$, again by the
+\textsc{go-stop}
+rule. Again, if $a$ and $b$ coincide or the path is degenerate, this
+rocket amounts to the identity.
 
 
 %\appendix
