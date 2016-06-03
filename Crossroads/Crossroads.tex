@@ -333,7 +333,17 @@ element is $\void$, or we could just add an $\eta$-rule.
 \textbf{introduce the judgmental equality} $\jq$
 
 
-\section{Paths As Abstractions Over the Interval}
+Equality is a congruence respecting $\leadsto$, but it is not
+necessarily the least such. We may also consider type-directed
+$\eta$-expansion rules, such as
+\[\begin{array}{@{}l@{\;\;R=}l@{\;\Rightarrow\; R\;\ni\; r\jq\; }l@{}}
+\textsc{one-$\eta$}&\One&\void \\
+\textsc{sg-$\eta$}&(x\hb S)\times T[x])& (r\hb R).1, (r\hb R).2 \\
+\textsc{pi-$\eta$}&(x\hb S)\to T[x])& \lambda x.\,(r\hb R)\:x\\
+\end{array}\]
+
+
+\section{Paths Abstracting Types Over the Interval}
 
 The term `equality' is laden with philosophical baggage. Let us slough
 off that burden and consider the idea of connecting things with paths.
@@ -363,12 +373,13 @@ Let us start with paths between types.
      {\star' \ni S\tp{\star}T}
 \\
 \textsc{chk-typ-lam}\;
-\Rule{\bar i\vdash \star \ni P[i]\quad S\jq P[\pl]\quad P[\pr]\jq T}
+\Rule{\bar i\vdash \star \ni P[i]\quad \star\ni S\jq P[\pl]\quad
+    \star\ni P[\pr]\jq T}
      {S\tp{\star}T \ni \lambda i.\,P[i]}
 \end{array}\]
 Note that the interval between $\pl$ and $\pr$ is not a type, so the
 binding in context $\bar i$ is of a different form. We shall need a
-separate judgment for \emph{points}.
+separate judgment for \emph{points}, offering at least the following.
 \newcommand{\pt}[1]{\textsc{pt}\;#1}
 \[
 \textsc{pt-$\pl$}\;\Axiom{\pt\pl}\qquad 
@@ -376,28 +387,186 @@ separate judgment for \emph{points}.
 \textsc{pt-var}\;\Rule{\dashv \bar i}
                       {\pt i}
 \]
+
 Now we can explain how to project from a path at a given
 point.
 \[\begin{array}{c}
 \textsc{syn-typ-app}\;
-\Rule{E\in S\tp{\star}T\quad \pt p}
-     {E\:p\in\star}
+\Rule{E\in S\tp{\star}T\quad \pt a}
+     {E\:a\in\star}
 \\
 \textsc{red-typ-$\beta$}\;
-(\lambda i.\,P[i]:S\tp{\star}T)\:p\leadsto P[p]:\star
+(\lambda i.\,P[i]:S\tp{\star}T)\:a\leadsto P[a]:\star
 \end{array}\]
 
-It is usual to add further computation rules, allowing projection
-of \emph{endpoints}, necessitating type reconstruction.
+The above $\beta$-rule is enough for the evaluation of closed
+expressions, but the equational theory of open terms can readily
+be enriched by further computation rules, allowing projection
+of \emph{endpoints} which are known, in that types of eliminations
+can be reconstructed.
 \[\begin{array}{c}
-\textsc{red-typ-$\pl$?}\;
+\textsc{red-typ-$\pl$}\;
   E\in S\tp\star T \;\Rightarrow\; E\:\pl\leadsto S\hb\star\\
-\textsc{red-typ-$\pr$?}\;
+\textsc{red-typ-$\pr$}\;
   E\in S\tp\star T \;\Rightarrow\; E\:\pr\leadsto T\hb\star\\
 \end{array}\]
 The critical pairs with $\beta$ induced by these rules are
 guaranteed to be resolvable, given that the construction of canonical
 paths enforces coincidence with the endpoints stated in the type.
+
+It is highly likely that we shall also want an $\eta$-law.
+\[
+\textsc{typ-$\eta$}\;\;
+  R=S\tp\star T\;\Rightarrow\; R\ni r \jq \lambda i.\,(r\hb R)\:i
+\]
+
+However, the key thing we can do with types joined by paths is to
+transport values between them, along those paths. Transportation is
+not teleportation. Rather, it can be seen as the extrusion of a value
+from one point on a type path to every point on the type path,
+creating a path between values, followed by the projection of the
+value at a chosen destination. Before we consider transportation, let
+us introduce paths between values.
+
+
+\section{Paths Between Values Over Type Paths}
+
+If we have a path connecting types, we establish one basis for
+proposing connections between values of those types.
+\newcommand{\vp}[1]{-\!\!\!\left[#1\right]\!\!\!-}
+\[\textsc{chk-vap}\;
+\Rule{\star'\ni S\tp\star T \quad S\tp\star T\ni P\quad
+      S\ni s\quad T\ni t}
+     {\star'\ni s \vp{P\hb S\tp\star T} t}
+\]
+To construct such a path, one may exhibit the points thereon.
+\[\textsc{chk-vap-lam}\;
+\Rule{\begin{array}{c}
+    \bar i\vdash  (P\hb S\tp\star T)\:i\ni p[i]\\\
+      S\ni s\jq p[\pl]\quad T\ni p[\pr]\jq t \end{array}}
+     {s \vp{P\hb S\tp\star T} t \ni \lambda i.\,p[i]}
+\]
+Of course, we must also have projection.
+\[\begin{array}{c}
+\textsc{syn-vap-app}\;
+\Rule{e\in s \vp{P\hb S\tp\star T} t\quad \pt a}
+     {e\:a\in(P\hb S\tp\star T)\:a}
+\\
+\textsc{red-vap-$\beta$}\;
+(\lambda i.\,p[i]:s \vp{P\hb S\tp\star T} t)\:a\leadsto p[a]:(P\hb S\tp\star T)\:a\\
+\textsc{red-vap-$\pl$}\;
+  e\in s \vp{P\hb S\tp\star T} t \;\Rightarrow\; e\:\pl\leadsto s\hb S\\
+\textsc{red-vap-$\pr$}\;
+  e\in s \vp{P\hb S\tp\star T} t \;\Rightarrow\; e\:\pr\leadsto t\hb T\\
+\textsc{vap-$\eta$}\;\;
+  R=s \vp{P\hb S\tp\star T} t\;\Rightarrow\; R\ni r \jq \lambda i.\,(r\hb R)\:i
+\end{array}\]
+
+
+\section{Rocketing Between Types}
+
+We can transport values along paths, and not just from
+one end to the other, but between \emph{any} connected points,
+allowing us to ensure that values transported along type paths
+remain connected by value paths. In OTT, the `coercion' operation
+really did teleport values, and its `coherence' (the equality of
+teleported values before and afterwards) was asserted by
+brute force, exploiting proof irrelevance. Here, values travel
+in a rocket, passing continuously through space along a given type
+path.
+\newcommand{\xp}[4]%
+  {#1\:\overline{\underline{\left>#2\!\!\mid\!\! #3 \!\!\mid\!\! #4\right>\!\!}}\;}
+\[
+\Rule{\pt a\quad  E\in S\tp\star T \quad \pt b\quad E\:a\ni r}
+     {\xp r a E b \in E\:b}
+\]
+The notation is intended to suggest sending $r$ from $a$ to $b$ along
+$E$, but as far as typing is concerned, this construct is an
+elimination form for $E$, rather than $r$. We shall ensure that
+\[
+s\vp{E\hb S\tp\star T} \xp s \pl E \pr \ni
+\lambda i.\,\xp s \pl E i
+\]
+The typical point on the path certainly has the right type, and it is
+surely connected at the $\pr$ end, but to check the connection at the
+$\pl$ end, we shall need that
+\[
+  S\ni s\jq \xp s \pl E \pl
+\]
+
+Rocketing must compute, so for every means we have to introduce
+paths between types, we must be able to explain the behaviour of a
+rocket along those paths. Moreover, for every equation which
+holds judgmentally between type paths, we must ensure that the
+rockets they induce coincide also.
+
+However, we
+shall have, in general, that remaining motionless changes nothing.
+\[
+\textsc{go-stop}\;\;\xp s a E a \leadsto s\hb E\:a
+\]
+That is, we cannot change anything by standing still on a
+path. Moreover, we cannot change anything by moving along a path
+if the path itself is degenerate.
+\[
+\textsc{go-still}\;\;\xp s a {\lambda\_.\,S} b \leadsto s\hb S
+\]
+Note that in the presence of $\eta$, a `pattern' $\lambda i.\,P[i]$
+matches some $T$ if it the body of the $\eta$-expansion of $T$ over
+some fresh variable $i$ matches $P[i]$. The above rule effectively
+demands an occur-check.
+
+There may very well be circular paths which are not degenerate, but in
+some sense, they must move away from their origin and then return,
+rather than remaining constantly in one place. Moreover, to achieve
+any noticeable difference by transmitting a value along such a
+circular path, one must travel a nontrivial distance. The above rules
+thus do not, conceptually at least, compromise univalence, nor do they
+presume it.
+
+\section{Rocketing for Structural Type Paths}
+
+We say that a type path $\lambda i.\,P[i]$ is `structural' if $P[i]$
+is given by a canonical type former, meaning that any movement in the
+path happens within the components of that type.  The idea behind OTT
+is that the only closed paths are the structural paths, but univalence
+adds others. Whatever other paths we may have, we shall certainly have
+the structural paths, so at least these must admit rocketing. For base
+types, $\Zero$, $\One$, $\Two$, structural paths are degenerate and
+their rockets act as the identity.
+
+For dependent pairs, a structural path must be componentwise. Note
+that there are paths between pair types which are not componentwise
+(e.g., swapping the components of a binary product), but that these
+paths cannot be given structurally. A rocket of pairs is a pair of
+rockets. Eliding obvious type information, we get
+\[\begin{array}{l}
+\xp{(s,t)}a{\lambda i.\,(x\hb S[i])\times T[i,x]}b \leadsto
+  (\hat s[b], \hat t[b]):\cdots\;\;\textrm{where} \\
+\qquad\begin{array}{l}
+  \hat s[j]= \xp s a {\lambda i.\,S[i]} j \\
+  \hat t[j]= \xp t a {\lambda i.\,T[i,\hat s[i]]} j \\
+\end{array}
+\end{array}\]
+That is, we construct $\hat s$ and $\hat t$, being the images of $s$,
+and $t$ over the entire path. Moreover, we need the full generality of
+$\hat s$ to give the path over which $t$ can rocket. Note that $\hat
+s[s]$ is just $s$ by the \textsc{go-stop} rule, so $t$ has the
+correct type for its rocket.
+
+For dependent functions, we rocket back and forth.
+\[\begin{array}{l}
+\xp{r}a{\lambda i.\,(x\hb S[i])\to T[i,x]}b \leadsto
+  \lambda x.\, \hat t[b]:\cdots\;\;\textrm{where} \\
+\qquad\begin{array}{l}
+  \hat s[j]= \xp x b {\lambda i.\,S[i]} j \\
+  \hat t[j]= \xp {(r\hb\cdots) (\hat s[a])} a {\lambda i.\,T[i,\hat s[i]]} j \\
+\end{array}
+\end{array}\]
+We can readily check that $r$ (which comes from the $a$ side) gets an
+argument it can use, and that the eventual output (on the $b$ side),
+has type $T[b,\hat s[b]] = T[b,x]$, again by the \textsc{go-stop} rule.
+
 
 %\appendix
 %\section{Appendix Title}
