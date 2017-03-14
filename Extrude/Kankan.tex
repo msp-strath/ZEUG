@@ -1,0 +1,454 @@
+\documentclass{article}
+\usepackage{a4wide}
+\usepackage{pig}
+\usepackage{upgreek}
+\usepackage{stmaryrd}
+\usepackage{amssymb}
+\ColourEpigram
+
+\newcommand{\hb}{\!:\!}
+\newcommand{\ZERO}{\blue{\mathsf{0}}}
+\newcommand{\ONE}{\blue{\mathsf{1}}}
+\newcommand{\TWO}{\blue{\mathsf{2}}}
+\newcommand{\TO}{\mathrel{\blue{\to}}}
+\newcommand{\PI}[2]{\blue{(}#1\hb #2\blue{)\to\;}}
+\newcommand{\SG}[2]{\blue{(}#1\hb #2\blue{)\,\times\,}}
+\newcommand{\WW}[2]{\blue{(}#1\hb #2\blue{)\,\triangleleft\,}}
+\newcommand{\PA}[2]{#1\mathbin{\blue{-}}#2}
+\newcommand{\void}{\red{\ast}}
+\newcommand{\ttt}{\red{\mathsf{t\!t}}}
+\newcommand{\fff}{\red{\mathsf{f\!f}}}
+\newcommand{\la}[1]{\red{\uplambda}#1.\,}
+\newcommand{\pr}{\red{,}\,}
+\newcommand{\tr}{\red{\blacktriangleleft}\,}
+\newcommand{\pa}[1]{\red{\uppi}#1.\,}
+\newcommand{\el}[1]{\red{\underline{\black{#1}}}}
+\newcommand{\fst}{\:\green{\mathsf{fst}}}
+\newcommand{\snd}{\:\green{\mathsf{snd}}}
+\newcommand{\bad}[1]{\:\green{\mathsf{bad}[}#1\green{]}}
+\newcommand{\side}[2]{\:\green{\mathsf{side}_{#1}[}#2\green{]}}
+\newcommand{\base}[1]{\:\green{\mathsf{base}[}#1\green{]}}
+\newcommand{\cond}[4]{\:\green{\mathsf{cond}[}#1.\,#2\green{\,\mid\,}#3\green{\,\mid\,}#4\green{]}}
+\newcommand{\ind}[3]{\:\green{\mathsf{rec}[}#1.\,#2\green{\,\mid\,}#3\green{]}}
+\newcommand{\ze}{\orange{\mathsf{0}}}
+\newcommand{\un}{\orange{\mathsf{1}}}
+\newcommand{\mux}[3]{#1\orange{(}#2\orange{,}\,#3\orange{)}}
+\newcommand{\eval}[1]{\llbracket #1 \rrbracket}
+\newcommand{\pj}{\,\orange{@}}
+\newcommand{\KAN}[6]{\blue{\begin{array}{r|c|l}
+                        & \black{#6} & \\
+                     \black{#2} & \black{.#1.} & \black{#3} \\
+                        & \black{#4.\,#5} & \\
+                      \cline{2-2}
+                     \end{array}}}
+\newcommand{\kan}[6]{\red{\begin{array}{r|c|l}
+                        & \black{#6} & \\
+                     \black{#2} & \black{.#1.} & \black{#3} \\
+                        & \black{#4.\,#5} & \\
+                      \cline{2-2}
+                     \end{array}}}
+\newcommand{\TYPE}[1]{\textsc{type}\;#1}
+\newcommand{\POINT}[1]{\textsc{point}\;#1}
+
+\begin{document}
+\title{Kan types and values}
+\author{Conor McBride and James Chapman}
+\maketitle
+
+\section{Introduction}
+
+This is another attempt at a `European' cubical type theory which computes.
+In this attempt, the type formation judgment makes a reappearance.
+
+
+\section{Plain Type Theory}
+
+\[\begin{array}{rrll}
+S,T     & ::= & \ZERO \;|\; \ONE \;|\; \TWO   & \mbox{base types} \\
+        &   | & \PI x S T(x)   & \mbox{function types}\\
+        &   | & \SG x S T(x)   & \mbox{pair types}\\
+        &   | & \WW x S T(x)   & \mbox{tree types}
+\medskip\\
+s,t     & ::= & \void \;|\; \ttt \;|\; \fff & \mbox{base values} \\
+        &   | & \la x t(x)     & \mbox{abstraction}\\
+        &   | & s \pr t        & \mbox{pair} \\
+        &   | & s \tr t        & \mbox{tree} \\
+        &   | & \el e          & \mbox{elimination}
+\medskip\\
+e,f,E,F & ::= & x              & \mbox{variable}\\
+        &   | & e\bad T        & \mbox{absurdity elimination}\\
+        &   | & e\cond x{T(x)}t{t'}    & \mbox{dependent conditional}\\
+        &   | & f\:s           & \mbox{function application}\\
+        &   | & e\fst          & \mbox{left projection from pair}\\
+        &   | & e\snd          & \mbox{right projection from pair}\\
+        &   | & e\ind x{T(x)}t    & \mbox{induction}\\
+        &   | & s:S            & \mbox{type ascription}
+\medskip\\
+\Gamma & ::= & \varepsilon   & \mbox{empty} \\
+       &   | & \Gamma,x\hb S & \mbox{variable extension} \\
+\end{array}\]
+
+
+We write $\dashv x\hb S$ for the assertion that the context contains
+the given variable extension. So the variable rule is
+\[
+\Rule{\dashv x\hb S}
+     {x\in S}
+\]
+
+\subsection{Base Types}
+\[
+\Axiom{\TYPE\ZERO}
+\qquad
+\Rule{e\in\ZERO\quad\TYPE T}
+     {e\bad T \in T}
+\]
+\[
+\Axiom{\TYPE\ONE}
+\qquad
+\Axiom{\ONE\ni\void}
+\qquad
+\Axiom{\ONE\ni t\equiv\void}
+\]
+\[
+\Axiom{\TYPE\TWO}
+\qquad
+\Axiom{\TWO\ni\ttt}
+\qquad
+\Axiom{\TWO\ni\fff}
+\qquad
+\Rule{e\in\TWO\quad
+      x\hb\TWO\vdash \TYPE{T(x)}\quad
+      T(\ttt)\ni t\quad
+      T(\fff)\ni t'}
+     {e\cond x{T(x)}t{t'}\in T(e)}
+\]
+
+Computation:
+\[
+(\ttt:\TWO)\cond x{T(x)}t{t'}\in T(x) \leadsto t:T(\ttt) \qquad 
+(\fff:\TWO)\cond x{T(x)}t{t'}\in T(x) \leadsto t':T(\fff)
+\]
+
+\subsection{Function Types}
+
+\[
+\Rule{\TYPE S\quad x\hb S \vdash \TYPE T(x)}
+     {\TYPE \PI x S T(x)}
+\qquad 
+\Rule{x\hb S \vdash T(x)\ni t(x)}
+     {\PI x S T(x) \ni \la x t(x)}
+\qquad
+\Rule{f\in \PI x S T(x)\quad S\ni s}
+     {f\:s\in T(s:S)}
+\]
+Computation is as usual:
+\[
+(\la x t(x) : \PI x S T(x))\:s \leadsto t(s:S) : T(s:S)
+\]
+Definitional equality includes the $\eta$-rule:
+\[
+\Axiom{\PI x S T(x) \ni \el f \equiv \la x \el{f\:x}}
+\]
+
+\subsection{Pair Types}
+\[
+\Rule{\TYPE S\quad x\hb S \vdash \TYPE T(x)}
+     {\TYPE \SG x S T(x)}
+\qquad 
+\Rule{S\ni s\quad T(s:S)\ni t}
+     {\SG x S T(x) \ni s\pr t}
+\qquad
+\Rule{e\in \SG x S T(x)}
+     {e\fst\in S}
+\qquad
+\Rule{e\in \SG x S T(x)}
+     {e\snd\in T(e\fst)}
+\]
+Again, we compute as usual:
+\[
+(s\pr t : \SG x S T(x))\fst\leadsto s:S \qquad 
+(s\pr t : \SG x S T(x))\snd\leadsto t:T(s:S)
+\]
+Again, we have an $\eta$-rule:
+\[
+\Axiom{\SG x S T(x) \ni \el e \equiv e\fst \pr e\snd}
+\]
+
+\subsection{Tree Types}
+
+\[
+\Rule{\TYPE S\quad x\hb S \vdash \TYPE T(x)}
+     {\TYPE \WW x S T(x)}
+\qquad 
+\Rule{S\ni s\quad T(s:S) \TO \WW x S T(x) \ni t}
+     {\WW x S T(x) \ni s\tr t}
+\]
+\[
+\Rule{\begin{array}{@{}l@{}
+     }e\in \WW x S T(x)\quad
+      w\hb \WW x S T(x) \vdash \TYPE T'(w) \\
+      \PI xS\PI w{T(x) \TO \WW x S T(x)}(\PI
+        y{T(x)}T'(w\:\el y))\TO
+        T'(\el x\tr \el w:\WW x S T(x)) \ni t'
+      \end{array}}
+     {e\ind x{T'(x)}{t'}\in T'(e)}
+\]
+Computation:
+\[\begin{array}{@{}l@{}}
+(s\tr t : \WW x S T(x))\ind x{T'(x)}{t'}\\
+\leadsto
+(t':\PI xS\PI w{T(x) \TO \WW x S T(x)}(\PI
+        y{T(x)}T'(w\:\el y))\TO
+        T'(\el x\tr \el w:\WW x S T(x)))\\
+\qquad
+\:s\:t\:\la y (t :T(s:S) \TO \WW x S T(x))\:y\ind x{T'(x)}{t'}
+\end{array}\]
+
+
+\section{Points, Path Types and Transportation}
+
+
+\[\begin{array}{rrll}
+S,T     & ::= & \PA {T_0}{T_1}  & \mbox{type path type}\\
+        &   | & E\pj m         & \mbox{type projection}
+\medskip\\
+s,t     & ::= & \pa i T        & \mbox{type path} \\
+\medskip\\
+e,f,E,F & ::= & E\:s           & \mbox{path transportation}\\
+\medskip\\
+m       & ::= & i              & \mbox{coordinate} \\
+        &   | & \ze            & \mbox{left end} \\
+        &   | & \un            & \mbox{right end} \\
+        &   | & \mux{i}{m_0}{m_1} & \mbox{rescaling} 
+\medskip\\
+\Gamma & ::= & \Gamma,i      & \mbox{coordinate extension} \\
+\end{array}\]
+
+We write premise $i\vDash J(i)$ for the conjunction of $J(\ze)$ and
+$J(\un)$.
+
+\subsection{Points}
+
+\[
+\Rule{\dashv i}
+     {\POINT i}
+\qquad
+\Axiom{\POINT \ze}
+\qquad
+\Axiom{\POINT \un}
+\qquad
+\Rule{\POINT m \quad i\vDash\POINT m_i}
+     {\POINT \mux m{m_0}{m_1}}
+\]
+
+
+\newcommand{\pop}[1]{#1^{\orange\circ}}
+Point substitution requires simplification whenever a variable is replaced
+by an end or a rescaling. We also simplify degenerate rescalings.
+\[\begin{array}{lcll}
+\mux\ze{m_0}{m_1} & = & m_0 \\
+\mux\un{m_0}{m_1} & = & m_1 \\
+\mux i \ze\un & = & i \\
+\mux i m m & = & m \\
+\mux {\mux{i}{m_0}{m_1}}{m'_0}{m'_1} & = &
+  \mux i {\mux{m_0}{m'_0}{m'_1}}{\mux{m_1}{m'_0}{m'_1}}
+\end{array}\]
+We may write $\pop i$ to abbreviate $\mux i \un \ze$. Note that
+$\pop{(\pop i)}$ simplifies to $i$.
+
+Points are \emph{standardized} with respect to contexts by the following rules,
+reminiscent of building \emph{ordered binary decision diagrams}.
+\newcommand{\stdp}[2]{\mathrm{std}(#1 | #2)}
+\[\begin{array}{lcll}
+\stdp\varepsilon m & = & m \\
+\stdp{\Gamma,x\hb S}{m} & = & \stdp \Gamma m \\
+\stdp{\Gamma,i}{m(i)} & = & \mux i {\stdp \Gamma {m(\ze)}}{\stdp \Gamma {m(\un)}}
+  & \mbox{otherwise}
+\end{array}\]
+Definitional equality of open points is equality after standardization. 
+
+\subsection{Path Types}
+
+\[
+\Rule{i\vDash\TYPE T_i}
+     {\TYPE \PA{T_0}{T_1}}
+\qquad
+\Rule{i\vdash \TYPE T(i)\quad i\vDash T(i)\equiv T_i}
+     {\PA{T_0}{T_1}\ni \pa i T(i)}
+\qquad
+\Rule{E\in \PA{T_0}{T_1}\quad \POINT m}
+     {\TYPE E\pj m}
+\]
+Transportation overloads application, treating type paths as explicit coercions.
+\[
+\Rule{E\in \PA{T_0}{T_1}\quad T_0\ni t_0}
+     {E\:t_0\in T_1}
+\]
+Computation (which relies on type reconstruction):
+\[
+i\vDash \Rule{E\in \PA{T_0}{T_1}}
+{E\pj i \leadsto T_i}
+\qquad
+\Axiom{(\pa i T(i) : \PA{T_0}{T_1}) \pj m \leadsto T(m)}
+\]
+
+
+\section{Kan Types and Kan Values}
+
+A Kan type is at some point $m$ in the top of a square, where we know
+both sides and the base. The Kan types thus provide the means to fill
+in the top of the square.
+
+\[\begin{array}{rrll}
+S,T     & ::= & \KAN i{T_0(i)}{T_1(i)}j{S(j)}m & \mbox{Kan type}\\
+\medskip\\
+s,t     & ::= & \kan i{t_0(i)}{t_1(i)}j{s(j)}m & \mbox{Kan value}\\
+\medskip\\
+e,f,E,F & ::= & e\side\ze m & \mbox{point on the $\ze$ side} \\
+        &   | & e\side\un m & \mbox{point on the $\un$ side} \\
+        &   | & e\base m & \mbox{point on the base} \\
+\end{array}\]
+
+\[
+\Rule{j\vDash i\vdash \TYPE T_j(i) \quad
+      j\vdash \TYPE S(j) \quad
+      j\vDash T_j(0)\equiv S(j) \quad
+      \POINT m}
+     {\TYPE \KAN i{T_0(i)}{T_1(i)}j{S(j)}m}
+\]
+
+Kan values, correspondingly, represent interpolant values in the top
+of a square, given values at the sides and the base.
+\[
+\Rule{j\vDash i\vdash T_j(i)\ni t_j(i) \quad
+      j\vdash S(j) \ni s(j) \quad
+      j\vDash S(j) \ni t_j(0)\equiv s(j)}
+     {\KAN i{T_0(i)}{T_1(i)}j{S(j)}m \ni
+      \kan i{t_0(i)}{t_1(i)}j{s(j)}m}
+\]
+\[
+j\vDash
+\Rule{e\in \KAN i{T_0(i)}{T_1(i)}j{S(j)}m\quad \POINT n}
+     {e\side jn\in T_j(n)}
+\qquad
+\Rule{e\in \KAN i{T_0(i)}{T_1(i)}j{S(j)}m\quad \POINT n}
+     {e\base n\in S(n)}
+\]
+
+Computation:
+\[j\vDash
+\left(
+\kan i{t_0(i)}{t_1(i)}j{s(j)}m
+:
+\KAN i{T_0(i)}{T_1(i)}j{S(j)}m
+\right)\side jn \leadsto t_j(n):T_j(n)
+\]
+\[
+\left(
+\kan i{t_0(i)}{t_1(i)}j{s(j)}m
+:
+\KAN i{T_0(i)}{T_1(i)}j{S(j)}m
+\right)\base n \leadsto s(n):S(n)
+\]
+
+This isn't quite right: the elim forms need to know the Kan types,
+because they might collapse.
+
+Kan types collapse in various special cases:
+\begin{description}
+\item[bumping the sides] If the coordinate $m$ is either $\ze$ or
+  $\un$, the Kan object collapses to its relevant top corner.
+\[
+j\vDash\left\{\begin{array}{l}
+\KAN i{T_0(i)}{T_1(i)}j{S(j)}j \leadsto T_j(\un) \\
+\kan i{t_0(i)}{t_1(i)}j{s(j)}j \leadsto t_j(\un)
+\end{array}\right.
+\]
+\item[flattening to its base] If both sides don't go anywhere, the
+  whole square (hence its top) is the degenerate base.
+\[
+\begin{array}{l}
+\KAN \_{T_0}{T_1}j{S(j)}m \leadsto S(m) \\
+\kan \_{t_0}{t_1}j{s(j)}m \leadsto s(m)
+\end{array}
+\]
+\item[pulling itself together] If the base doesn't go anywhere and
+  both sides agree everywhere, then the whole square is the
+  degenerate common side (and the interpolant is the common top
+  point, regardless of $m$).
+\[
+\begin{array}{l}
+\KAN i{T(i)}{T(i)}\_{T(0)}m \leadsto T(\un) \\
+\kan i{t(i)}{t(i)}\_{t(0)}m \leadsto t(\un)
+\end{array}
+\]
+\end{description}
+
+But it's not enough to say this collapse happens: we have to say
+how to get hold of the sides and the base, even when a collapse
+has happened.
+
+\begin{description}
+\item[bumping the sides]
+  Given $t_0 : T_0(\un)\equiv \KAN i{T_0(i)}{T_1(i)}j{S(j)}\ze$, we
+  must recover the sides and base by smearing the point in the
+  top-left corner anticlockwise around the square.
+  \[\begin{array}{l}
+    (t_0 : T_0(\un))\side\ze i \leadsto
+       (\pa k T_0(\mux k\un i))\:t_0 \\
+    (t_0 : T_0(\un))\base j \leadsto
+       (\pa k S(\mux k\ze j))\:((t_0 : T_0(\un))\side\ze\ze) \\
+    (t_0 : T_0(\un))\side\un i \leadsto
+       (\pa k T_1(\mux k\ze i))\:((t_0 : T_0(\un))\base\un)
+  \end{array}\]
+  Given $t_1 : T_1(\un)\equiv \KAN i{T_0(i)}{T_1(i)}j{S(j)}\un$, we
+  must recover the sides and base by smearing the point in the
+  top-right corner clockwise around the square.
+  \[\begin{array}{l}
+    (t_1 : T_1(\un))\side\un i \leadsto
+       (\pa k T_1(\mux k\un i))\:t_1 \\
+    (t_1 : T_1(\un))\base j \leadsto
+       (\pa k S(\mux k\un j))\:((t_1 : T_1(\un))\side\un\ze) \\
+    (t_1 : T_1(\un))\side\ze i \leadsto
+       (\pa k T_0(\mux k\ze i))\:((t_1 : T_1(\un))\base\ze)
+  \end{array}\]
+\item[flattening to its base]
+  Given $s:S(m)\equiv \KAN \_{T_0}{T_1}j{S(j)}m$, we recover the sides
+  and base
+  \[\begin{array}{l}
+    (s:S(m))\base j \leadsto (\pa k S(\mux kmj))\:s \\
+    j\vDash (s:S(m))\side ji \leadsto (s:S(m))\base j
+  \end{array}\]
+\item[pulling itself together]
+  Given $t:T(1)\equiv \KAN i{T(i)}{T(i)}\_{T(0)}m$, we recover sides
+  and base
+  \[\begin{array}{l}
+  j\vDash(t:T(1))\side ji \leadsto (\pa k T(\mux k\un i))\:t \\
+  (t:T(1))\base j \leadsto (\pa k T(\mux k\un \ze))\:t
+  \end{array}\]
+\end{description}
+
+\textbf{Plot hole?} Extensionally, it's true that along any type path,
+a value somewhere determines a value anywhere. Correspondingly, we can
+recover the sides and base of a Kan value from a value at any point on
+the sides or base. Is this true intensionally? The risk is that a Kan
+value which collapses might not re-expand to its original intensional
+form. What gives? Is it too much to ask that Kan types have an
+$\eta$-law?
+
+\textbf{Plot hole?} Can we really justify ``pulling itself together''?
+Does it sneak intensional symmetry in through the back door?
+Intensional symmetry is incompatible with univalence: we can't rely
+on transporting there-and-back being intensionally the identity (just
+provably the identity), because there are such liars in the world,
+such cheats.
+
+\textbf{Alternative?} Give a Kan value as an unobservable choice
+between feeding a value in at the top-left and a value in at the
+top-right. Are the base and sides then uniquely determined?
+
+\textbf{Idea} Introduction forms of Kan values correspond to modes of
+Kan collapse.
+
+\end{document}
