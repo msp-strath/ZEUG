@@ -1,0 +1,431 @@
+\documentclass{article}
+\usepackage{a4wide}
+\usepackage{pig}
+\usepackage{upgreek}
+\usepackage{stmaryrd}
+\usepackage{amssymb}
+\ColourEpigram
+
+\newcommand{\hb}{\!:\!}
+\newcommand{\TY}{\blue{\star}}
+\newcommand{\ZERO}{\blue{\mathsf{0}}}
+\newcommand{\ONE}{\blue{\mathsf{1}}}
+\newcommand{\TWO}{\blue{\mathsf{2}}}
+\newcommand{\TO}{\mathrel{\blue{\to}}}
+\newcommand{\PI}[2]{\blue{(}#1\hb #2\blue{)\to\;}}
+\newcommand{\SG}[2]{\blue{(}#1\hb #2\blue{)\,\times\,}}
+\newcommand{\WW}[2]{\blue{(}#1\hb #2\blue{)\,\triangleleft\,}}
+\newcommand{\PA}[2]{#1\mathbin{\blue{-}}#2}
+\newcommand{\PATH}[3]{#2\mathbin{\blue{\langle}#1\blue{\rangle}}#3}
+\newcommand{\void}{\red{\ast}}
+\newcommand{\ttt}{{\red{\mathsf{1}}}}
+\newcommand{\fff}{{\red{\mathsf{0}}}}
+\newcommand{\la}[1]{\red{\uplambda}#1.\,}
+\newcommand{\pr}{\red{,}\,}
+\newcommand{\tr}{\red{\blacktriangleleft}\,}
+\newcommand{\pa}[1]{\red{\uppi}#1.\,}
+\newcommand{\el}[1]{\red{\underline{\black{#1}}}}
+\newcommand{\fst}{\:\green{\mathsf{fst}}}
+\newcommand{\snd}{\:\green{\mathsf{snd}}}
+\newcommand{\bad}[1]{\:\green{\mathsf{bad}[}#1\green{]}}
+\newcommand{\side}[2]{\:\green{\mathsf{side}_{#1}[}#2\green{]}}
+\newcommand{\base}[1]{\:\green{\mathsf{base}[}#1\green{]}}
+\newcommand{\cond}[4]{\:\green{\mathsf{cond}[}#1.\,#2\green{\,\mid\,}#3\green{\,\mid\,}#4\green{]}}
+\newcommand{\ind}[3]{\:\green{\mathsf{rec}[}#1.\,#2\green{\,\mid\,}#3\green{]}}
+\newcommand{\ze}{{\orange{\mathsf{0}}}}
+\newcommand{\un}{{\orange{\mathsf{1}}}}
+\newcommand{\mux}[3]{#1\orange{(}#2\orange{,}\,#3\orange{)}}
+\newcommand{\eval}[1]{\llbracket #1 \rrbracket}
+\newcommand{\pj}{\,\orange{@}}
+\newcommand{\KAN}[6]{\blue{\begin{array}{|@{}r@{}c@{}l@{}|}
+                        & \black{#6} & \\
+                     \black{#2} & \black{.#1.} & \black{#3} \\
+                        & \black{#4.\,#5} & \\
+                      \hline
+                     \end{array}}}
+\newcommand{\kan}[6]{\red{\begin{array}{|@{}r@{}c@{}l@{}|}
+                        & \black{#6} & \\
+                     \black{#2} & \black{.#1.} & \black{#3} \\
+                        & \black{#4.\,#5} & \\
+                      \hline
+                     \end{array}}}
+\newcommand{\ikan}[7]{\red{\begin{array}{|@{}r@{}c@{}l@{}|}
+                        \hline
+                     \black{#2} & \black{.#1.} & \black{#3} \\
+                        \red{\blacksquare}\hfill & \black{#4.\,#5} & \hfill\red{\blacksquare} \\
+                      \hline
+                     \end{array}}(#6,#7)}
+\newcommand{\hkan}[7]{\green{\begin{array}{@{}r|@{}c@{}|l@{}}
+                        & \black{#7} & \\
+                        & \black{#1} &\\
+                     \black{#3} & \black{.#2.} & \black{#4} \\
+                        \cline{2-2}
+               \multicolumn{1}{r}{}         & \multicolumn{1}{c}{\black{#5.\,#6}} & \\
+                     \end{array}}}
+\newcommand{\TYPE}[1]{\TY\ni #1}
+\newcommand{\POINT}[1]{\textsc{point}\;#1}
+
+\begin{document}
+\title{April Fool}
+\author{The Strathcube Gang}
+\maketitle
+
+\section{Introduction}
+
+This is another attempt at a `European' cubical type theory which computes.
+In this attempt, the type formation judgment makes a reappearance.
+
+
+\section{Plain Type Theory}
+
+\[\begin{array}{rrll}
+S,T,s,t & ::= & \TY   & \mbox{type of types} \\
+        &   | & \ZERO & \mbox{empty type}\\
+        &   | & \ONE  \;|\; \void & \mbox{unit type and value}\\
+        &   | & \TWO \;|\; \fff \;|\; \ttt & \mbox{pair type and values} \\
+        &   | & \PI x S T(x)   & \mbox{function types}\\
+        &   | & \la x t(x)     & \mbox{abstraction}\\
+        &   | & \SG x S T(x)   & \mbox{pair types}\\
+        &   | & s \pr t        & \mbox{pair} \\
+        &   | & \WW x S T(x)   & \mbox{tree types} \\
+        &   | & s \tr t        & \mbox{tree} \\
+        &   | & \el e          & \mbox{elimination}
+\medskip\\
+e,f,E,F & ::= & x              & \mbox{variable}\\
+        &   | & e\:a           & \mbox{action}\\
+        &   | & s:S            & \mbox{type ascription}
+\medskip\\
+a       & ::= & \bad T        & \mbox{absurdity elimination}\\
+        &   | & \cond x{T(x)}{t_\fff}{t_\ttt}    & \mbox{dependent conditional}\\
+        &   | & s           & \mbox{function application}\\
+        &   | & \fst          & \mbox{left projection from pair}\\
+        &   | & \snd          & \mbox{right projection from pair}\\
+        &   | & \ind x{T(x)}t    & \mbox{induction}\\
+\medskip\\
+\Gamma & ::= & \varepsilon   & \mbox{empty} \\
+       &   | & \Gamma,\gamma & \mbox{extension}
+\medskip\\
+\gamma & ::= & x\hb S & \mbox{variable extension} \\
+\end{array}\]
+
+
+Our habit is to suppress the context that is shared by rules, assuming
+its omnipresence. We write $\gamma\vdash A$ for the assertion that $A$
+holds after extending the context with $\gamma$.
+We write $\dashv \gamma$ for the assertion that the context contains
+the given extension $\gamma$.
+
+\subsection{Administration}
+\[
+\Rule{\dashv x\hb S}
+     {x\in S}
+\qquad
+\Rule{e\in S\quad \TYPE{S\equiv T}}
+     {T\ni\el e}
+\qquad
+\Rule{\TYPE S\quad S\ni s}
+     {s:S \in S}
+\qquad
+\el{t:T}\leadsto t
+\qquad
+\el{x\:\vec{a}}:T\leadsto x\:\vec{a}
+\]
+
+\subsection{Type in Type}
+\[
+\Axiom{\TYPE\TY}
+\]
+
+\subsection{Base Types}
+\[
+\Axiom{\TYPE\ZERO}
+\qquad
+\Rule{e\in\ZERO\quad\TYPE T}
+     {e\bad T \in T}
+\]
+\[
+\Axiom{\TYPE\ONE}
+\qquad
+\Axiom{\ONE\ni\void}
+\qquad
+\Axiom{\ONE\ni t\equiv\void}
+\]
+We write $x\vDash A(x)$ for the conjunction of $A(\fff)$ and
+$A(\ttt)$.
+
+\[
+\Axiom{\TYPE\TWO}
+\qquad
+\Axiom{x\vDash\TWO\ni x}
+\qquad
+\Rule{e\in\TWO\quad
+      x\hb\TWO\vdash \TYPE{T(x)}\quad
+      x\vDash T(x)\ni t_x}
+     {e\cond x{T(x)}{t_\fff}{t_\ttt}\in T(e)}
+\]
+
+Computation:
+\[
+j\vDash(j:\TWO)\cond x{T(x)}{t_\fff}{t_\ttt}\in T(x) \leadsto t_j:T(j)
+\]
+
+\subsection{Function Types}
+
+\[
+\Rule{\TYPE S\quad x\hb S \vdash \TYPE T(x)}
+     {\TYPE \PI x S T(x)}
+\qquad 
+\Rule{x\hb S \vdash T(x)\ni t(x)}
+     {\PI x S T(x) \ni \la x t(x)}
+\qquad
+\Rule{f\in \PI x S T(x)\quad S\ni s}
+     {f\:s\in T(s:S)}
+\]
+Computation is as usual:
+\[
+(\la x t(x) : \PI x S T(x))\:s \leadsto t(s:S) : T(s:S)
+\]
+Definitional equality includes the $\eta$-rule:
+\[
+\Axiom{\PI x S T(x) \ni \el f \equiv \la x \el{f\:x}}
+\]
+
+\subsection{Pair Types}
+\[
+\Rule{\TYPE S\quad x\hb S \vdash \TYPE T(x)}
+     {\TYPE \SG x S T(x)}
+\qquad 
+\Rule{S\ni s\quad T(s:S)\ni t}
+     {\SG x S T(x) \ni s\pr t}
+\qquad
+\Rule{e\in \SG x S T(x)}
+     {e\fst\in S}
+\qquad
+\Rule{e\in \SG x S T(x)}
+     {e\snd\in T(e\fst)}
+\]
+Again, we compute as usual:
+\[
+(s\pr t : \SG x S T(x))\fst\leadsto s:S \qquad 
+(s\pr t : \SG x S T(x))\snd\leadsto t:T(s:S)
+\]
+Again, we have an $\eta$-rule:
+\[
+\Axiom{\SG x S T(x) \ni \el e \equiv e\fst \pr e\snd}
+\]
+
+\subsection{Tree Types}
+
+\[
+\Rule{\TYPE S\quad x\hb S \vdash \TYPE T(x)}
+     {\TYPE \WW x S T(x)}
+\qquad 
+\Rule{S\ni s\quad T(s:S) \TO \WW x S T(x) \ni t}
+     {\WW x S T(x) \ni s\tr t}
+\]
+\[
+\Rule{\begin{array}{@{}l@{}
+     }e\in \WW x S T(x)\quad
+      w\hb \WW x S T(x) \vdash \TYPE T'(w) \\
+      \PI xS\PI w{T(x) \TO \WW x S T(x)}(\PI
+        y{T(x)}T'(w\:\el y))\TO
+        T'(\el x\tr \el w:\WW x S T(x)) \ni t'
+      \end{array}}
+     {e\ind x{T'(x)}{t'}\in T'(e)}
+\]
+Computation:
+\[\begin{array}{@{}l@{}}
+(s\tr t : \WW x S T(x))\ind x{T'(x)}{t'}\\
+\leadsto
+(t':\PI xS\PI w{T(x) \TO \WW x S T(x)}(\PI
+        y{T(x)}T'(w\:\el y))\TO
+        T'(\el x\tr \el w:\WW x S T(x)))\\
+\qquad
+\:s\:t\:\la y (t :T(s:S) \TO \WW x S T(x))\:y\ind x{T'(x)}{t'}
+\end{array}\]
+
+
+\section{Points, Path Types and Transportation}
+
+
+\[\begin{array}{rrll}
+S,T,s,t & ::= & \PATH T{t_\ze}{t_\un}  & \mbox{path type}\\
+        &   | & \pa i T        & \mbox{path} \\
+\medskip\\
+a       & ::= & \pj m          & \mbox{path projection}\\
+\medskip\\
+m       & ::= & i              & \mbox{coordinate} \\
+        &   | & \ze            & \mbox{left end} \\
+        &   | & \un            & \mbox{right end} \\
+        &   | & \mux{i}{m_0}{m_1} & \mbox{rescaling} 
+\medskip\\
+\Gamma & ::= & \Gamma,i      & \mbox{coordinate extension} \\
+\end{array}\]
+
+\subsection{Points}
+We write $i\vDash A(i)$ for the conjunction of $A(\ze)$ and
+$A(\un)$.
+
+\[
+\Rule{\POINT m}
+     {\gamma\vdash\POINT m}
+\qquad
+\Axiom{\POINT \ze}
+\qquad
+\Axiom{\POINT \un}
+\qquad
+\Rule{i\vDash\POINT m_i}
+     {i\vdash\POINT \mux i{m_\ze}{m_\un}}\;
+  m_\ze\neq m_\un
+\]
+
+
+\newcommand{\pop}[1]{#1^{\ze}}
+
+That is, points are reduced ordered binary decision diagrams.
+
+We typically write $i$ for $\mux i \ze\un$ and $\pop i$ for
+$\mux i\un\ze$. We may also write $i^{\un}$ for $i$.
+
+We can define hereditary substitution for points because
+the operation $\mux m{m_\ze}{m_\un}$ is admissible in general.
+The resulting theory validates
+\[
+i\vDash \mux i{m_\ze}{m_\un}\equiv m_i
+\qquad
+\mux \_ mm \equiv m
+\]
+
+
+\subsection{Path Types}
+
+\[
+\Rule{\TYPE T \quad i\vDash T\ni T_i}
+     {\TYPE \PATH{T}{t_\ze}{t_{\un}}}
+\qquad
+\Rule{i\vdash T\ni t(i)\quad i\vDash T\ni t(i)\equiv t_i}
+     {\PATH{T}{t_\ze}{t_\un}\ni \pa i t(i)}
+\qquad
+\Rule{e\in \PATH{T}{t_\ze}{t_\un}\quad \POINT m}
+     {e\pj m \in T}
+\]
+We like to write $\PA{T_\ze}{T_\un}$ for $\PATH\TY{T_\ze}{T_\un}$. These paths between
+types are equipped with another eliminator:
+transportation overloads application, treating type paths as explicit coercions.
+\[
+\Rule{E\in \PA{T_\ze}{T_\un}\quad T_\ze\ni t_\ze}
+     {E\:t_\ze\in T_\un}
+\]
+Computation for projection (which relies on type reconstruction):
+\[
+i\vDash \Rule{e\in \PATH{T}{t_\ze}{t_\un}}
+{E\pj i \leadsto t_i}
+\qquad
+\Axiom{(\pa i t(i) : \PATH{T}{t_\ze}{t_\un}) \pj m \leadsto t(m):T}
+\]
+Computation for transportation is a bigger deal which we'll get back
+to. But we will have at least the fact that going nowhere does
+nothing.
+\[
+(\pa\_ T : \PA TT)\:t \leadsto t:T
+\]
+
+
+\section{Kan Constructions}
+
+A Kan construction is at some point $m$ in the top of a square, where we know
+both sides and the base. The Kan types thus provide the means to fill
+in the top of the square.
+
+\[\begin{array}{rrll}
+S,T,s,t     & ::= & \kan i{t_\ze(i)}{t_\un(i)}j{s(j)}m & \mbox{Kan construction}
+\end{array}\]
+
+Kan constructions represent interpolant values in the top
+of a square, given values at the sides and the base.
+\[
+\Rule{j\vDash i\vdash T\ni t_j(i) \quad
+      j\vdash T \ni s(j) \quad
+      j\vDash T \ni t_j(\ze)\equiv s(j) \quad
+     \POINT m}
+     {T \ni
+      \kan i{t_\ze(i)}{t_\un(i)}j{s(j)}m}
+\]
+
+When $T$ is $\TY$, we like to draw the three sides in blue, but it's
+not a new thing, just a special case.
+\[
+\Rule{j\vDash i\vdash \TYPE T_j(i) \quad
+      j\vdash \TYPE S(j) \quad
+      j\vDash \TYPE T_j(\ze)\equiv T(j) \quad
+     \POINT m}
+     {\TYPE
+      \KAN i{T_\ze(i)}{T_\un(i)}j{S(j)}m}
+\]
+
+
+Kan types collapse in various special cases:
+\begin{description}
+\item[bumping the sides] If the coordinate $m$ is either $\ze$ or
+  $\un$, the Kan object collapses to its relevant top corner.
+\[
+j\vDash\begin{array}{l}
+\kan i{t_\ze(i)}{t_\un(i)}j{s(j)}j \leadsto t_j(\un)
+\end{array}
+\]
+\item[flattening to its base] If both sides don't go anywhere, the
+  whole square (hence its top) is the degenerate base.
+\[
+\begin{array}{l}
+\kan \_{s(\ze)}{s(\un)}j{s(j)}m \leadsto s(m)
+\end{array}
+\]
+\end{description}
+
+Note, however, that tall thin Kan constructions do \emph{not}
+collapse.
+\[
+\kan i{t(i)}{t(i)}\_{t(\ze)}m \not\leadsto t(\un)
+\]
+
+Rescaling means we can construct the whole square. We define
+\[
+\ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}ij =
+\kan k{t_\ze(\mux k\ze i)}{t_\un(\mux k\ze i)}j{s(j)}j
+\]
+and we note that the collapse rules make the square coincide with the
+known points on its boundary.
+\[
+\ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}\ze j \equiv s(j)
+\qquad
+j\vDash \ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}ij \equiv t_j(i)
+\]
+Moreover, the construction ensures that the lid also fits.
+\[
+\ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}\un j \equiv \kan i{t_\ze(i)}{t_\un(i)}j{s(j)}j
+\]
+
+If we have a square of types, we can define the \emph{heterogeneous}
+Kan construction.
+\[
+\Rule{i\vdash j\vdash \TYPE T(i,j) \qquad
+      j\vDash i\vdash T(i,j)\ni t_j(i) \qquad
+      j\vdash T(\ze,j)\ni s(j) \qquad
+      j\vDash T(\ze,j)\ni t_j(\ze)\equiv s(j) \qquad
+      \POINT m}
+   {\hkan{i.j.T(i,j)}i{t_\ze(i)}{t_\un(i)}j{s(j)}m\in T(\un,m)}
+\]
+The square of types allows us, by transportation, to iron the values
+down into whichever type from the square we happen to want
+\[
+\hkan{i.j.T(i,j)}i{t_\ze(i)}{t_\un(i)}j{s(j)}m\in T(\un,m) =
+  \kan i{(\pa k{T(\mux k{(i,\ze)}{\un,m}})\:t_\ze(i)\hspace*{-0.8in}}
+        {\hspace*{-0.8in}(\pa k{T(\mux k{(i,\un)}{(\un,m)})})\:t_\un(i)}
+       j{(\pa k {T(\mux k{(\ze,j)}{(\un,m)})})\:s(j)}m
+  : T(\un,m)
+\]
+writing $\mux k{(m_\ze,m'_\ze)}{(m_\un,m'_\un)}$ for
+$(\mux k {m_\ze}{m_\un},\mux k {m'_\ze}{m'_\un})$.
+
+
+\end{document}
