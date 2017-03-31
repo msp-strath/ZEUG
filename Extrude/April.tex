@@ -300,7 +300,7 @@ i\vDash \mux i{m_\ze}{m_\un}\equiv m_i
 \subsection{Path Types}
 
 \[
-\Rule{\TYPE T \quad i\vDash T\ni T_i}
+\Rule{\TYPE T \quad i\vDash T\ni t_i}
      {\TYPE \PATH{T}{t_\ze}{t_{\un}}}
 \qquad
 \Rule{i\vdash T\ni t(i)\quad i\vDash T\ni t(i)\equiv t_i}
@@ -325,7 +325,8 @@ i\vDash \Rule{e\in \PATH{T}{t_\ze}{t_\un}}
 \]
 Computation for transportation is a bigger deal which we'll get back
 to. But we will have at least the fact that going nowhere does
-nothing.
+nothing. Thierry calls this `regularity', which is indeed an
+admirable quality of a transportation system.
 \[
 (\pa\_ T : \PA TT)\:t \leadsto t:T
 \]
@@ -426,6 +427,111 @@ down into whichever type from the square we happen to want
 \]
 writing $\mux k{(m_\ze,m'_\ze)}{(m_\un,m'_\un)}$ for
 $(\mux k {m_\ze}{m_\un},\mux k {m'_\ze}{m'_\un})$.
+
+Doubtless, there'll be more to say.
+
+
+\section{Transportation}
+
+How do you send something over a type path? It depends on the path,
+but at least rescaling keeps things coherent. Whenever we have
+\[
+\pa i S(i) : \PA {S(\ze)}{S(\un)}
+\]
+it will be convenient to define
+\[
+S(j-k) = \pa i S(\mux ijk) : \PA {S(j)}{S(k)}
+\]
+allowing us to transmit values from any entry point on the original
+path to any exit point, not just from $\ze$ to $\un$.
+
+
+\subsection{Function, Pair and Tree Transportation}
+
+Transporting pairs works componentwise.
+
+\[
+(\pa i \SG x {S(i)}{T(i,x)})\:p_\ze \leadsto
+  s(\un) \pr (\pa i {T(i,s(i))})\:(p_\ze\snd)
+  \mbox{where}\;s(i) = S(\ze,i)\:(p_\ze\fst)
+\]
+We need to be able to move the first component anywhere in order
+to build the path for transporting the second component. Rescaling
+lets us do that. If the pair type does not actually depend on $i$,
+then neither will the path $S(\ze,i)$, so $s(i)$ will be a constant,
+and the path transporting the second component will also be
+degenerate. Hence, this rule is compatible with regularity.
+
+Transporting functions amounts to transporting the input from $\un$
+to $\ze$, then the output back to $\un$.
+\[
+(\pa i \PI x {S(i)}{T(i,x)})\:f_\ze \leadsto
+  \la {s_\un} (\pa i {T(i, s(i))})\:(f_\ze\:s(\ze))\;
+  \mbox{where}\;s(i) = S(\un,i)\:s_\un
+\]
+Note that $s(\un)\equiv s_\un$, so we have the correct type. Moreover,
+if our function type does not depend on $i$, then $s(\_)=s_\un$,
+and $T(i,s(i))$ does not depend on $i$ either. Hence, this rule
+is compatible with regularity.
+
+Transporting trees is a similar dance, but strict.
+\[\begin{array}{l}
+(\pa i \WW x {S(i)}{T(i,x)})\:(s_\ze\tr t_\ze) \leadsto
+  s(\un)\tr \la {x_\un} (\pa i \WW x
+  {S(i)}{T(i,x)})\:(t_\ze\:(T'(\un,\ze)\:x_\un))
+\;\mbox{where}\\ \qquad s(i)=S(\ze,i)\:s_\ze;\;
+  T'(i) = T(i, s(i))
+\end{array}\]
+
+
+\subsection{Path Transportation}
+
+Transporting paths requires us to build the lid of a square when we
+know both sides and the base. That's why we invented Kan
+constructions.
+\[
+(\pa i \PATH{T(i)}{t_\ze(i)}{t_\un(i)})\:p \leadsto
+\hkan{i.j.T(i)}i{t_\ze(i)}{t_\un(i)}j{p\pj j}{-}
+\]
+If the path type does not depend on $i$, neither do the sides of the
+square, so it collapses to its base. Hence, this rule is compatible
+with regularity.
+
+
+\subsection{Kansportation}
+
+How on earth do we transport values between Kan types?
+\[
+(\pa h \KAN i{T_\ze(h,i)}{T_\un(h,i)}j{S(h,j)}{m(h)})\:v \leadsto \;?
+\]
+
+The need to be compatible with regularity means we should not take
+values down to the base and up again unless we are sure the path is
+not degenerate. And the only way that can happen is if we can see
+that the path is \emph{diagonal}. That is the situation given by
+\[
+k\vDash (\pa h \KAN i{T_\ze(h,i)}{T_\un(h,i)}j{S(h,j)}{h^k})\:v \leadsto \;?
+\]
+where we are transporting from the point with $(h,i,j)$ coordinates
+$(\ze,\un,k^\ze)$ to $(\un,\un,k)$. We transport down to the base,
+across the diagonal of the base, then up.
+\[
+ (T_{k}(\un,(\ze,\un)) \cdot (\pa h S(h,h^k)) \cdot T_{k^\ze}(\ze,(\un,\ze)))\:v
+\]
+This rule is trivially compatible with regularity, because there is
+only one thing that can make such a path degenerate: $h^k$ cannot be constant
+in $h$, so degeneration must be caused by the sides of the squares
+collapsing to a degenerate base, in which case all three stages of our
+transportation become trivial.
+
+Meanwhile, if $m(\ze)=m(\un)$ then $m(h)$ is a constant, as a
+consequence of our affine language of points. If this $m$ is a
+canonical constant, then the square collapses to one corner for every
+$h$, so transportation over the square reduces to transportation along
+one `corner rail': in fact, if we collapse aggressively, we will not
+even see such problems.
+
+That is, the diagonal rule is all we need.
 
 
 \end{document}
