@@ -6,6 +6,7 @@
 \usepackage{amssymb}
 \ColourEpigram
 
+\newcommand{\F}[1]{\green{\mathsf{#1}}}
 \newcommand{\hb}{\!:\!}
 \newcommand{\TY}{\blue{\star}}
 \newcommand{\ZERO}{\blue{\mathsf{0}}}
@@ -28,15 +29,18 @@
 \newcommand{\fst}{\:\green{\mathsf{fst}}}
 \newcommand{\snd}{\:\green{\mathsf{snd}}}
 \newcommand{\bad}[1]{\:\green{\mathsf{bad}[}#1\green{]}}
-\newcommand{\side}[2]{\:\green{\mathsf{side}_{#1}[}#2\green{]}}
-\newcommand{\base}[1]{\:\green{\mathsf{base}[}#1\green{]}}
 \newcommand{\cond}[4]{\:\green{\mathsf{cond}[}#1.\,#2\green{\,\mid\,}#3\green{\,\mid\,}#4\green{]}}
 \newcommand{\ind}[3]{\:\green{\mathsf{rec}[}#1.\,#2\green{\,\mid\,}#3\green{]}}
 \newcommand{\ze}{{\orange{\mathsf{0}}}}
 \newcommand{\un}{{\orange{\mathsf{1}}}}
+\newcommand{\base}{{\!\orange{\textvisiblespace}\!}}
 \newcommand{\mux}[3]{#1\orange{(}#2\orange{,}\,#3\orange{)}}
 \newcommand{\eval}[1]{\llbracket #1 \rrbracket}
 \newcommand{\pj}{\,\orange{@}}
+\newcommand{\EQUIV}[7]{\blue{\left[\black{\begin{array}{rcl}
+   #1&#7&#2\\
+   #3&#5\quad#6&#4\\
+   \end{array}}\right]}}
 \newcommand{\KAN}[6]{\blue{\begin{array}{|@{}r@{}c@{}l@{}|}
                         & \black{#6} & \\
                      \black{#2} & \black{.#1.} & \black{#3} \\
@@ -339,29 +343,29 @@ both sides and the base. The Kan types thus provide the means to fill
 in the top of the square.
 
 \[\begin{array}{rrll}
-S,T,s,t     & ::= & \kan i{t_\ze(i)}{t_\un(i)}j{s(j)}m & \mbox{Kan construction}
+S,T,s,t     & ::= & \kan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}m & \mbox{Kan construction}
 \end{array}\]
 
 Kan constructions represent interpolant values in the top
 of a square, given values at the sides and the base.
 \[
 \Rule{j\vDash i\vdash T\ni t_j(i) \quad
-      j\vdash T \ni s(j) \quad
-      j\vDash T \ni t_j(\ze)\equiv s(j) \quad
+      j\vdash T \ni t_\base(j) \quad
+      j\vDash T \ni t_j(\ze)\equiv t_\base(j) \quad
      \POINT m}
      {T \ni
-      \kan i{t_\ze(i)}{t_\un(i)}j{s(j)}m}
+      \kan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}m}
 \]
 
 When $T$ is $\TY$, we like to draw the three sides in blue, but it's
 not a new thing, just a special case.
 \[
 \Rule{j\vDash i\vdash \TYPE T_j(i) \quad
-      j\vdash \TYPE S(j) \quad
+      j\vdash \TYPE S_\base(j) \quad
       j\vDash \TYPE T_j(\ze)\equiv T(j) \quad
      \POINT m}
      {\TYPE
-      \KAN i{T_\ze(i)}{T_\un(i)}j{S(j)}m}
+      \KAN i{T_\ze(i)}{T_\un(i)}j{S_\base(j)}m}
 \]
 
 
@@ -371,14 +375,14 @@ Kan types collapse in various special cases:
   $\un$, the Kan object collapses to its relevant top corner.
 \[
 j\vDash\begin{array}{l}
-\kan i{t_\ze(i)}{t_\un(i)}j{s(j)}j \leadsto t_j(\un)
+\kan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}j \leadsto t_j(\un)
 \end{array}
 \]
 \item[flattening to its base] If both sides don't go anywhere, the
   whole square (hence its top) is the degenerate base.
 \[
 \begin{array}{l}
-\kan \_{s(\ze)}{s(\un)}j{s(j)}m \leadsto s(m)
+\kan \_{t_\base(\ze)}{t_\base(\un)}j{t_\base(j)}m \leadsto t_\base(m)
 \end{array}
 \]
 \end{description}
@@ -391,19 +395,19 @@ collapse.
 
 Rescaling means we can construct the whole square. We define
 \[
-\ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}ij =
-\kan k{t_\ze(\mux k\ze i)}{t_\un(\mux k\ze i)}j{s(j)}j
+\ikan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}ij =
+\kan k{t_\ze(\mux k\ze i)}{t_\un(\mux k\ze i)}j{t_\base(j)}j
 \]
 and we note that the collapse rules make the square coincide with the
 known points on its boundary.
 \[
-\ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}\ze j \equiv s(j)
+\ikan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}\ze j \equiv t_\base(j)
 \qquad
-j\vDash \ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}ij \equiv t_j(i)
+j\vDash \ikan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}ij \equiv t_j(i)
 \]
 Moreover, the construction ensures that the lid also fits.
 \[
-\ikan i{t_\ze(i)}{t_\un(i)}j{s(j)}\un j \equiv \kan i{t_\ze(i)}{t_\un(i)}j{s(j)}j
+\ikan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}\un j \equiv \kan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}j
 \]
 
 If we have a square of types, we can define the \emph{heterogeneous}
@@ -411,18 +415,18 @@ Kan construction.
 \[
 \Rule{i\vdash j\vdash \TYPE T(i,j) \qquad
       j\vDash i\vdash T(i,j)\ni t_j(i) \qquad
-      j\vdash T(\ze,j)\ni s(j) \qquad
-      j\vDash T(\ze,j)\ni t_j(\ze)\equiv s(j) \qquad
+      j\vdash T(\ze,j)\ni t_\base(j) \qquad
+      j\vDash T(\ze,j)\ni t_j(\ze)\equiv t_\base(j) \qquad
       \POINT m}
-   {\hkan{i.j.T(i,j)}i{t_\ze(i)}{t_\un(i)}j{s(j)}m\in T(\un,m)}
+   {\hkan{i.j.T(i,j)}i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}m\in T(\un,m)}
 \]
 The square of types allows us, by transportation, to iron the values
 down into whichever type from the square we happen to want
 \[
-\hkan{i.j.T(i,j)}i{t_\ze(i)}{t_\un(i)}j{s(j)}m\in T(\un,m) =
-  \kan i{(\pa k{T(\mux k{(i,\ze)}{\un,m}})\:t_\ze(i)\hspace*{-0.8in}}
+\hkan{i.j.T(i,j)}i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}m\in T(\un,m) =
+  \kan i{(\pa k{T(\mux k{(i,\ze)}{(\un,m)}})\:t_\ze(i)\hspace*{-0.8in}}
         {\hspace*{-0.8in}(\pa k{T(\mux k{(i,\un)}{(\un,m)})})\:t_\un(i)}
-       j{(\pa k {T(\mux k{(\ze,j)}{(\un,m)})})\:s(j)}m
+       j{(\pa k {T(\mux k{(\ze,j)}{(\un,m)})})\:t_\base(j)}m
   : T(\un,m)
 \]
 writing $\mux k{(m_\ze,m'_\ze)}{(m_\un,m'_\un)}$ for
@@ -453,7 +457,7 @@ Transporting pairs works componentwise.
 \[
 (\pa i \SG x {S(i)}{T(i,x)})\:p_\ze \leadsto
   s(\un) \pr (\pa i {T(i,s(i))})\:(p_\ze\snd)
-  \mbox{where}\;s(i) = S(\ze,i)\:(p_\ze\fst)
+  \quad\mbox{where}\;s(i) = S(\ze-i)\:(p_\ze\fst)
 \]
 We need to be able to move the first component anywhere in order
 to build the path for transporting the second component. Rescaling
@@ -466,8 +470,8 @@ Transporting functions amounts to transporting the input from $\un$
 to $\ze$, then the output back to $\un$.
 \[
 (\pa i \PI x {S(i)}{T(i,x)})\:f_\ze \leadsto
-  \la {s_\un} (\pa i {T(i, s(i))})\:(f_\ze\:s(\ze))\;
-  \mbox{where}\;s(i) = S(\un,i)\:s_\un
+  \la {s_\un} (\pa i {T(i, s(i))})\:(f_\ze\:s(\ze))\quad
+  \mbox{where}\;s(i) = S(\un-i)\:s_\un
 \]
 Note that $s(\un)\equiv s_\un$, so we have the correct type. Moreover,
 if our function type does not depend on $i$, then $s(\_)=s_\un$,
@@ -479,7 +483,7 @@ Transporting trees is a similar dance, but strict.
 (\pa i \WW x {S(i)}{T(i,x)})\:(s_\ze\tr t_\ze) \leadsto
   s(\un)\tr \la {x_\un} (\pa i \WW x
   {S(i)}{T(i,x)})\:(t_\ze\:(T'(\un,\ze)\:x_\un))
-\;\mbox{where}\\ \qquad s(i)=S(\ze,i)\:s_\ze;\;
+\\ \qquad\mbox{where}\; s(i)=S(\ze-i)\:s_\ze;\;
   T'(i) = T(i, s(i))
 \end{array}\]
 
@@ -490,8 +494,8 @@ Transporting paths requires us to build the lid of a square when we
 know both sides and the base. That's why we invented Kan
 constructions.
 \[
-(\pa i \PATH{T(i)}{t_\ze(i)}{t_\un(i)})\:p \leadsto
-\hkan{i.j.T(i)}i{t_\ze(i)}{t_\un(i)}j{p\pj j}{-}
+(\pa i \PATH{T(i)}{t_\ze(i)}{t_\un(i)})\:t_\base \leadsto
+\hkan{i.j.T(i)}i{t_\ze(i)}{t_\un(i)}j{t_\base\pj j}{-}
 \]
 If the path type does not depend on $i$, neither do the sides of the
 square, so it collapses to its base. Hence, this rule is compatible
@@ -502,7 +506,7 @@ with regularity.
 
 How on earth do we transport values between Kan types?
 \[
-(\pa h \KAN i{T_\ze(h,i)}{T_\un(h,i)}j{S(h,j)}{m(h)})\:v \leadsto \;?
+\left(\pa h \KAN i{T_\ze(h,i)}{T_\un(h,i)}j{T_\base(h,j)}{m(h)}\right)\:t \leadsto \;?
 \]
 
 The need to be compatible with regularity means we should not take
@@ -510,13 +514,13 @@ values down to the base and up again unless we are sure the path is
 not degenerate. And the only way that can happen is if we can see
 that the path is \emph{diagonal}. That is the situation given by
 \[
-k\vDash (\pa h \KAN i{T_\ze(h,i)}{T_\un(h,i)}j{S(h,j)}{h^k})\:v \leadsto \;?
+k\vDash \left(\pa h \KAN i{T_\ze(h,i)}{T_\un(h,i)}j{T_\base(h,j)}{h^k}\right)\:t \leadsto \;?
 \]
 where we are transporting from the point with $(h,i,j)$ coordinates
 $(\ze,\un,k^\ze)$ to $(\un,\un,k)$. We transport down to the base,
 across the diagonal of the base, then up.
 \[
- (T_{k}(\un,(\ze,\un)) \cdot (\pa h S(h,h^k)) \cdot T_{k^\ze}(\ze,(\un,\ze)))\:v
+ (T_{k}(\un,(\ze,\un)) \cdot (\pa h T_\base(h,h^k)) \cdot T_{k^\ze}(\ze,(\un,\ze)))\:t
 \]
 This rule is trivially compatible with regularity, because there is
 only one thing that can make such a path degenerate: $h^k$ cannot be constant
@@ -532,6 +536,171 @@ one `corner rail': in fact, if we collapse aggressively, we will not
 even see such problems.
 
 That is, the diagonal rule is all we need.
+
+
+\section{Kan Distributes Over Elimination}
+
+The Kan construction invents a great many seemingly `new' elements of
+old types. We had better equip these new values with behaviour. To see
+the necessity, consider a Kan construction $F(i)\in A \TO \TY$: how do we
+transport along the edge of $\pa i F(i)\:a$ unless each application
+$F(i)\:A$ reduces to to a Kan construction?
+
+Fortunately, this is not too tricky to arrange.
+\[
+\left(\kan i{f_\ze(i)}{f_\un(i)}j{f_\base(j)}m:\PI xST(x)\right)\:s \leadsto
+\kan i{(f_\ze(i):\PI xST(x))\:s\hspace*{-0.7in}}
+      {\hspace*{-0.7in}(f_\un(i):\PI xST(x))\:s}
+     j{(f_\base(j):\PI xST(x))\:s}m : T(s:S)
+\]
+
+First projection is just as easy
+\[
+\left(\kan i{p_\ze(i)}{p_\un(i)}j{p_\base(j)}m:\SG xST(x)\right)\fst \leadsto
+\kan i{(p_\ze(i):\SG xST(x))\fst\hspace*{-0.7in}}
+      {\hspace*{-0.7in}(p_\un(i):\SG xST(x))\fst}
+     j{(p_\base(j):\SG xST(x))\fst}m : S
+\]
+but second projection requires a little type repair.
+\[\begin{array}{l}
+\left(\kan i{p_\ze(i)}{p_\un(i)}j{p_\base(j)}m:\SG xST(x)\right)\snd
+    \leadsto \\ \qquad
+  \hkan {i.j.T(s(i,j))} i{(p_\ze(i):\SG xST(x))\snd}
+      {(p_\un(i):\SG xST(x))\snd}
+     j{(p_\base(j):\SG xST(x))\snd}m \\
+\qquad\qquad  : T(s(\un,m)) \\
+\qquad  \mbox{where}\quad s(i,j) =
+    \left(\ikan i{p_\ze(i)}{p_\un(i)}j{p_\base(j)}ij:\SG xST(x)\right)\fst
+\end{array}\]
+
+The general situation is that if we have
+\[
+\Rule{e\in T\quad\cdots}
+     {e\:a\in P(e)}
+\]
+then
+\[\begin{array}{l}
+\left(\kan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}m:T\right)\:a
+\leadsto 
+\hkan {i.j.P(t(i,j):T)}
+   i{(t_\ze(i):T)\:a}{(t_\un(i):T)\:a}
+   j{(t_\base(j):T)\:a}m
+    : P(t(\un,m))
+\\ \qquad
+  \mbox{where}\quad t(i,j) = \ikan i{t_\ze(i)}{t_\un(i)}j{t_\base(j)}ij
+\end{array}\]
+
+
+\section{Should Kan Distribute Over Introduction?}
+
+It doesn't seem to be necessary for canonicity, but we could consider
+rules which allow `smoothing' of Kan squares. For example, if we have
+a Kan type where the sides and base are all function types
+\[
+\KAN i{\PI x{S_\ze(i)}T_\ze(i,x)\hspace*{-0.5in}}
+      {\hspace*{-0.5in}\PI x{S_\un(i)}T_\un(i,x)}
+     j{\PI x{S_\base(i)}T_\base(i,x)}m
+\]
+it might be reasonable to presume that the whole square might consist
+entirely of function types, and hence, in particular, the type at
+point $m$ in the lid. Might this become
+\[\begin{array}{l}
+\PI x{\KAN i{S_\ze(i)}{S_\un(i)}j{S_\base(j)}m}
+     {\KAN i{T_\ze(s(i,\ze))}{T_\un(s(i,\un))}j{T_\base(s(\ze,j))}m}
+\smallskip\\ \qquad \mbox{where}\quad
+  s(i,j) = \left(\pa k \ikan
+    i{S_\ze(i)}{S_\un(i)}j{S_\base(j)}{\mux k\un i}{\mux kmj}\right)\:x
+\end{array}\]
+?
+
+
+
+\section{J and Regularity}
+
+We have contractibility of singletons
+\[\begin{array}{rcl}
+\F{one}(X:\TY)(x:X)(y:X)(q:\PATH Xxy) & : &
+  \PATH{\SG yX\PATH Xxy}{(x\pr\pa\_x)}{(x\pr q)} \\
+&=& \pa i (q\pj i\pr q\pj{(\ze-i)})
+\end{array}\]
+and its right-ended counterpart
+\[\begin{array}{rcl}
+\F{eno}(X:\TY)(x:X)(y:X)(q:\PATH Xxy) & : &
+  \PATH{\SG xX\PATH Xxy}{(y\pr\pa\_x)}{(y\pr q)} \\
+&=& \pa i (q\pj i^\ze\pr q\pj{(i^\ze-\un)})
+\end{array}\]
+
+As a result, we have
+\[\begin{array}{rcl}
+\F{J}(X:\TY)(x:X)(y:X)(q:\PATH Xxy)(P:(\SG yX\PATH Xxy)\TO\TY)
+   (p:P\:(x\pr\pa\_x))  & : & P\:(y\pr q) \\
+ = \quad (\pa i P\:(\F{one}\:X\:x\:y\:q \pj i))\:p
+\end{array}\]
+and our rule for transporting across constant functions gives us that
+if $q$ is constant, $\F{J}$'s transport path is constant, so we get exactly $p$.
+
+
+\section{Univalence}
+
+We treat univalence by introducing a further notion of interpolant
+type.
+\[
+\Rule{\begin{array}{@{}l@{}}
+      i\vDash\TYPE T_i\qquad
+      i\vDash T_i\TO T_{i^\ze}\ni f_i \qquad
+      \PI{x_\un}{T_\un}\PATH{T_\un}{f_\ze\:(f_\un\:x_\un)}{x_\un} \ni
+        q \qquad \POINT m \\
+      \PI{x_\ze}{T_\ze}\PI{x_\un}{T_\un}
+         \PI{q'}{\PATH{T_\un}{f_\ze\:x_\ze}{x_\un}}
+          \PATH{\SG{x_\ze}{T_\ze}\PATH{T_\un}{f_\ze\:x_\ze}{x_\un}}
+               {(f_\un\:x_\un \pr q\:x_\un)}{(x_\ze\pr q')}
+        \ni u 
+     \end{array}}
+     {\TYPE \EQUIV{T_\ze}{T_\un}{f_\ze}{f_\un}qum}
+\]
+That is, the $f_i$ give us an isomorphism between the $T_i$.
+The $q$ tells us that $f_\un$ computes the inverse image of $f_\ze$
+at any given $t_\un$, giving us the path that connects them.
+The $u$ tells us that $f_\un$ and $q$ are unique for $f_\ze$.
+Note that
+\[
+  \PATH{T_\ze}{f_\un\:(f_\ze\:x_\ze)}{x_\ze}
+  \ni \pa i u\:x_\ze\:(f_\ze\:x_\ze)\:(\pa\_f_\ze\:x_\ze)\pj i\fst
+\]
+so we do round-trip both ways.
+
+As with Kan constructions, these interpolants collapse under certain
+circumstances. Certainly, they connect to their endpoints.
+\[
+i\vDash \EQUIV{T_\ze}{T_\un}{f_\ze}{f_\un}qui
+  \leadsto T_i
+\]
+They also collapse when the isomorphism is trivial.
+\[
+\EQUIV{T}{T}{\la xx}{\la xx}{\la x\pa\_x}
+  {\F{eno}\:T}m \leadsto T
+\]
+\textbf{(Do we care about the proofs when collapsing trivial isos? Perhaps not.)}
+
+Transportation across interpolants is triggered only when there can
+be no conflict with regularity, i.e., from some canonical $j$ to $j^\ze$.
+\[
+j\vDash (\pa i
+\EQUIV{T_\ze(i)}{T_\un(i)}{f_\ze(i)}{f_\un(i)}qu{i^{j^\ze}})\:x_j
+   \leadsto f_j(\un)\:(T_j(\ze-\un)\:x_j)
+\]
+The choice to deploy the isomorphism at $\un$ \emph{after} transportation is
+arbitrary, but the result is (\textbf{check}!) provably the same as
+transporting after deploying the isomorphism at $\ze$.
+
+Note that the proofs play no part in the transportation mechanism. So
+what are they for? We can use $\F{J}$ to construct a \emph{general} proof
+that transportation there-and-back across a type path
+round-trips. Plugging in univalence will give us an
+alternative candidate for the $q$ component, but $u$ tells us that any
+such alternative is related to $q$.
+
+
 
 
 \end{document}
