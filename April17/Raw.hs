@@ -114,8 +114,8 @@ type READ x i = Prog ReadLine (Got x) i
 -- to eat a raw term, eat a head then check for a tail
 rawR :: READ Raw i
 rawR = (headR />= tailR) />= \ rs -> case rs of
-  r :- Nothing  -> rgturn r          -- if we get a singleton, that's it
-  r :- Just rs  -> rgturn (RC r rs)  -- otherwise, it's a clump
+  Only r    -> rgturn r          -- if we get a singleton, that's it
+  r :-: rs  -> rgturn (RC r rs)  -- otherwise, it's a clump
 
 -- eat spaces until you see something that isn't
 spcR :: READ () i
