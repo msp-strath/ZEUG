@@ -1,7 +1,7 @@
 {-# LANGUAGE KindSignatures, DataKinds, EmptyCase, GADTs,
              DeriveFunctor, StandaloneDeriving, PolyKinds,
              TypeOperators, ScopedTypeVariables, RankNTypes,
-             TypeFamilies, UndecidableInstances #-}
+             TypeFamilies, UndecidableInstances, PatternSynonyms #-}
 module Utils where
 
 type family EQ x y where
@@ -82,6 +82,17 @@ xs <>< []       = xs
 B0        <>> ys = ys
 (xs :< x) <>> ys = xs <>> (x : ys)
 
+
+-- nonempty lists
+data NEL x = x :- Maybe (NEL x)
+nel :: NEL x -> [x]
+nel (x :- xs) = x : case xs of
+  Nothing  -> []
+  Just xs  -> nel xs
+instance Show x => Show (NEL x) where show = show . nel
+pattern Only x   = x :- Nothing
+pattern x :-: xs = x :- Just xs
+
 -- indexed unit type
 data Happy :: k -> * where
   Happy :: Happy k
@@ -148,3 +159,58 @@ class FunctorIx (f :: (i -> *) -> (j -> *)) where
 class FunctorIx f => MonadIx (f :: (i -> *) -> (i -> *)) where
   joinIx :: f (f x) -:> f x
   returnIx :: x -:> f x
+
+(?>=) :: MonadIx m => m s i -> (s -:> m t) -> m t i
+m ?>= k = joinIx (mapIx k m)
+
+data Prog :: ((i -> *) -> (i -> *)) -> ((i -> *) -> (i -> *)) where
+  RET :: s i -> Prog intf s i
+  DO  :: intf r i
+      -> (forall t. (s -:> Prog intf t) ->
+                    (r -:> Prog intf t))
+      -> Prog intf s i
+
+instance FunctorIx (Prog f) where
+  mapIx f (RET x)   = RET (f x)
+  mapIx f (DO c g)  = DO c $ \ k -> g (k . f)
+
+instance MonadIx (Prog f) where
+  returnIx = RET
+  joinIx (RET p)   = p
+  joinIx (DO c g)  = DO c $ \ k -> g (joinIx . mapIx k)
+
+cmd :: f x -:> Prog f x
+cmd c = DO c ($)
+
+data (@=) :: * -> i -> (i -> *) where
+  At :: x -> (x @= i) i
+
+mat :: (a -> b) -> ((a @= i) -:> (b @= i))
+mat f (At a) = At (f a)
+
+(@>=) :: MonadIx m => m (a @= j) i -> (a -> m t j) -> m t i
+m @>= k = m ?>= \ x -> case x of At a -> k a
+
+(@>) :: MonadIx m => m (() @= j) i -> m t j -> m t i
+m @> n = m @>= const n
+infixr 3 @>
+
+raturn :: MonadIx m => a -> m (a @= i) i
+raturn = returnIx . At
+
+data Got :: * -> (i -> *) where
+  Got :: x -> Got x i
+
+mgt :: (a -> b) -> (Got a -:> Got b)
+mgt f (Got a) = Got (f a)
+
+(/>=) :: MonadIx m => m (Got a) i -> (forall j. a -> m t j) -> m t i
+m />= k = m ?>= \ x -> case x of Got a -> k a
+
+(/>) :: MonadIx m => m (Got ()) i -> (forall j. m t j) -> m t i
+m /> n = m />= const n
+infixr 3 />
+
+rgturn :: MonadIx m => a -> m (Got a) i
+rgturn = returnIx . Got
+
