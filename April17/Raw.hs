@@ -24,7 +24,7 @@ data Raw
   |  RC Raw (NEL Raw)  -- clumps have a head and a nonempty tail
 
 instance Show Raw where
-  show = big where
+  show = wee where
     big (RA x)     = x
     big (RB x r)   = x ++ ". " ++ big r
     big (RC r rs)  = wee r ++ clu rs

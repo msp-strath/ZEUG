@@ -7,8 +7,21 @@ module Kernel where
 
 import Utils
 import OPE
+import Data.Void
 
 data Sort = Chk | Syn | Pnt
+
+data Sorty :: Sort -> * where
+  Chky :: Sorty Chk
+  Syny :: Sorty Syn
+  Pnty :: Sorty Pnt
+
+sortEq :: Sorty s -> Sorty s' -> Maybe (s == s')
+sortEq Chky Chky = Just Refl
+sortEq Syny Syny = Just Refl
+sortEq Pnty Pnty = Just Refl
+sortEq _    _    = Nothing
+  
 {-:: * where
   Chk :: Sort
   Syn :: Sort
@@ -27,15 +40,14 @@ data Term :: Sort -> (Bwd Sort -> *) where
   Pi :: (Term Chk  ><  Syn !- Term Chk) gamma -> Term Chk gamma
   Lam :: (Syn !- Term Chk) gamma -> Term Chk gamma
   E :: Term Syn gamma -> Term Chk gamma
-  V :: This Syn gamma -> Term Syn gamma
+  V :: This s gamma -> Term s gamma
   App :: (Term Syn >< Term Chk) gamma -> Term Syn gamma
 
 class Sub (f :: Bwd Sort -> *) where
   type SubImage f :: Bwd Sort -> *
   image :: f -:> SubImage f
-  sub :: f gamma' -> Select gamma' Syn ^ delta ->
-         Term Chk ^ delta -> SubImage f ^ delta
-
+  sub :: f gamma' -> Select gamma' s ^ delta ->
+         Instantiate s ^ delta -> SubImage f ^ delta
 
 instance (Sub f , Sub g) => Sub (f >< g) where
   type SubImage (f >< g) = SubImage f >< SubImage g
@@ -63,14 +75,23 @@ instance Sub (Term Chk) where
 instance Sub (Term Syn) where
   type SubImage (Term Syn) = Term Chk
   image = E
-  sub (V It) xr s = s
+  sub (V It) (Top :^ r) s = s
   sub (App fa) xr s = app (sub fa xr s)
 
 app :: (Term Chk >< Term Chk) ^ delta -> Term Chk ^ delta
 app (Pair c (E e) a :^ r) = E (App (Pair c e a)) :^ r
-app (Pair c (Lam (K t)) a :^ r) = t :^ r -<=- lCoP c 
-app (Pair c (Lam (L _ t)) a :^ r) =
-  sub t (Top :^ r -<=- lCoP c) (a :^ r -<=- rCoP c)
+app (Pair c (Lam t) a :^ r) =
+  instantiate (t :^ r -<=- lCoP c) (a :^ r -<=- rCoP c) 
+
+type family Instantiate (s :: Sort) :: Bwd Sort -> * where
+  Instantiate Syn = Term Chk
+  --Instantiate Chk = Term Chk -- ain't never gonna happen
+  Instantiate Pnt = Term Pnt
+
+instantiate :: (s !- Term Chk) ^ delta -> Instantiate s ^ delta ->
+               Term Chk ^ delta
+instantiate (K t :^ r) _ = t :^ r
+instantiate (L _ t :^ r) a = sub t (Top :^ r) a
 
 data Env :: Bwd Sort -> * -> * where
   N0 :: Env B0 a

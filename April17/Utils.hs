@@ -220,3 +220,6 @@ rgturn = returnIx . Got
 ------------------------------------------------------------------------------
 
 type Holds c = forall t . (c => t) -> t
+
+data (==) :: k -> k -> * where
+  Refl :: x == x

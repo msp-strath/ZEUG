@@ -226,5 +226,7 @@ abstract :: String -> f ^ (gamma :< s) -> (s !- f) ^ gamma
 abstract x (f :^ OS r) = L x f :^ r
 abstract _ (f :^ O' r) = K f :^ r
 
-
+dive :: (s !- f) ^ gamma -> f ^ (gamma :< s)
+dive (K f :^ r) = f :^ O' r
+dive (L _ f :^ r) = f :^ OS r
 
