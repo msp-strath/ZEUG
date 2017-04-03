@@ -16,10 +16,8 @@ renderBinder ns (L x t :^ r) = RB y (render (NS ns y) (t :^ OS r)) where
 
 render :: Namings gamma -> Term Chk ^ gamma -> Raw
 render ns (Star _ :^ _) = RA "Type"
-render ns (Pi (Pair c _S _T) :^ r) =
-  RC (RA "Pi")
-     (render ns (_S :^ r -<=- lCoP c) :-:
-      Only (renderBinder ns (_T :^ r -<=- rCoP c)))
+render ns (Pi _ST :^ r) = _ST :^ r >^< \ _S _T -> 
+  RC (RA "Pi") (render ns _S :-: Only (renderBinder ns _T))
 render ns (Lam t :^ r) = RC (RA "\\") (Only (renderBinder ns (t :^ r)))
 render ns (E e :^ r) = renderSyn ns (e :^ r) Nothing
 
@@ -30,7 +28,8 @@ itsName (NS ns _) (O' r) = itsName ns r
 renderSyn :: Namings gamma -> Term Syn ^ gamma -> Maybe (NEL Raw) -> Raw
 renderSyn ns (V It :^ r) Nothing = RA (itsName ns r)
 renderSyn ns (V It :^ r) (Just rs) = RC (RA (itsName ns r)) rs
-renderSyn ns (App (Pair c f a) :^ r) rs = renderSyn ns (f :^ r -<=- lCoP c) (Just (render ns (a :^ r -<=- rCoP c) :- rs))
+renderSyn ns (App fa :^ r) rs = fa :^ r >^< \f a ->
+  renderSyn ns f (Just (render ns a :- rs))
 
 -- render N0 (Star Void)
 -- render N0 (Pi (Pair CZZ (Star Void) (K (Star Void))))

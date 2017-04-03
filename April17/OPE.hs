@@ -212,6 +212,10 @@ infixr 8 ><
 pair :: f ^ theta -> g ^ theta -> (f >< g) ^ theta
 pair (f :^ r) (g :^ r') = case coP r r' of c :^ t -> Pair c f g :^ t 
 
+(>^<) :: (f >< g) ^ theta -> (f ^ theta -> g ^ theta -> t) -> t
+Pair c f g :^ r >^< h = h (f :^ r -<=- lCoP c) (g :^ r -<=- rCoP c)
+infixr 4 >^<
+
 -- usage and binding
 
 data This :: s -> (Bwd s -> *) where
