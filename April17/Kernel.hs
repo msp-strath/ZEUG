@@ -1,7 +1,8 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE GADTs, DataKinds, TypeOperators, KindSignatures,
              ConstraintKinds, RankNTypes, FlexibleInstances,
-             TypeFamilies #-}
+             TypeFamilies, StandaloneDeriving, DeriveFoldable,
+             DeriveFunctor, DeriveTraversable #-}
 module Kernel where
 
 import Utils
@@ -71,10 +72,10 @@ app (Pair c (Lam (K t)) a :^ r) = t :^ r -<=- lCoP c
 app (Pair c (Lam (L _ t)) a :^ r) =
   sub t (Top :^ r -<=- lCoP c) (a :^ r -<=- rCoP c)
 
-{- TODO
-   - [X] HRight, HBoth
-   - [X] generalize things that return them
-   - [X] sub for not pi
-   - [X] if f and g are Sub then f >< g is too
-   - [X] if f is Sub then s !- f is too
--}
+data Env :: Bwd Sort -> * -> * where
+  N0 :: Env B0 a
+  NS :: Env gamma a -> a -> Env (gamma :< s) a
+
+deriving instance Foldable (Env gamma)
+deriving instance Functor (Env gamma)
+deriving instance Traversable (Env gamma)
