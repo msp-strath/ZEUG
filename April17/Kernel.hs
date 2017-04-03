@@ -48,9 +48,9 @@ instance (Sub f , Sub g) => Sub (f >< g) where
 instance Sub f => Sub (s !- f) where
   type SubImage (s !- f) = s !- SubImage f
   image (K f) = K (image f)
-  image (L f) = L (image f)
+  image (L x f) = L x (image f)
   sub (K f) xr s = mapIx K $ sub f xr s
-  sub (L f) (x :^ r) (t :^ r') = abstract (sub f (Pop x :^ OS r) (t :^ O' r'))
+  sub (L y f) (x :^ r) (t :^ r') = abstract y (sub f (Pop x :^ OS r) (t :^ O' r'))
 
 instance Sub (Term Chk) where
   type SubImage (Term Chk) = Term Chk
@@ -68,7 +68,7 @@ instance Sub (Term Syn) where
 app :: (Term Chk >< Term Chk) ^ delta -> Term Chk ^ delta
 app (Pair c (E e) a :^ r) = E (App (Pair c e a)) :^ r
 app (Pair c (Lam (K t)) a :^ r) = t :^ r -<=- lCoP c 
-app (Pair c (Lam (L t)) a :^ r) =
+app (Pair c (Lam (L _ t)) a :^ r) =
   sub t (Top :^ r -<=- lCoP c) (a :^ r -<=- rCoP c)
 
 {- TODO

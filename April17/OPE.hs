@@ -219,12 +219,12 @@ data This :: s -> (Bwd s -> *) where
 
 data (!-) :: s -> (Bwd s -> *) -> (Bwd s -> *) where
   K :: f gamma -> (s !- f) gamma 
-  L :: f (gamma :< s) -> (s !- f) gamma
+  L :: String -> f (gamma :< s) -> (s !- f) gamma
 infixr 9 !-
 
-abstract :: f ^ (gamma :< s) -> (s !- f) ^ gamma
-abstract (f :^ OS r) = L f :^ r
-abstract (f :^ O' r) = K f :^ r
+abstract :: String -> f ^ (gamma :< s) -> (s !- f) ^ gamma
+abstract x (f :^ OS r) = L x f :^ r
+abstract _ (f :^ O' r) = K f :^ r
 
 
 
