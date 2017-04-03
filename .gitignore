@@ -14,3 +14,8 @@ cabal.sandbox.config
 *.prof
 *.aux
 *.hp
+*~
+*.bbl
+*.blg
+*.log
+*\#
