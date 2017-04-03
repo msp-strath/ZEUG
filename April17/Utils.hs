@@ -1,7 +1,8 @@
 {-# LANGUAGE KindSignatures, DataKinds, EmptyCase, GADTs,
              DeriveFunctor, StandaloneDeriving, PolyKinds,
              TypeOperators, ScopedTypeVariables, RankNTypes,
-             TypeFamilies, UndecidableInstances, PatternSynonyms #-}
+             TypeFamilies, UndecidableInstances, PatternSynonyms,
+             ConstraintKinds #-}
 module Utils where
 
 type family EQ x y where
@@ -214,3 +215,8 @@ infixr 3 />
 rgturn :: MonadIx m => a -> m (Got a) i
 rgturn = returnIx . Got
 
+------------------------------------------------------------------------------
+--  a type witnessing a constraint
+------------------------------------------------------------------------------
+
+type Holds c = forall t . (c => t) -> t

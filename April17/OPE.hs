@@ -13,13 +13,6 @@ module OPE where
 import Utils
 
 ------------------------------------------------------------------------------
---  a type witnessing a constraint
-------------------------------------------------------------------------------
-
-type Holds c = forall t . (c => t) -> t
-
-
-------------------------------------------------------------------------------
 --  order-preserving embeddings
 ------------------------------------------------------------------------------
 
@@ -172,31 +165,33 @@ data Select :: Bwd s -> s -> Bwd s -> * where
 
 -- selections interact with coproducts to tell us where to find the selected
 data Hits :: s -> Bwd s -> Bwd s -> Bwd s -> * where
-  HLeft  :: Select gamma0' s ^ gamma -> gamma1' <= gamma ->
+  HLeft  :: Select gamma0' s gamma0 ->
+            CoP gamma0 gamma1' gamma ->
             Hits s gamma0' gamma1' gamma
-  HRight :: Hits s gamma0' gamma1' gamma
-  HBoth  :: Hits s gamma0' gamma1' gamma
+  HRight ::                            Select gamma1' s gamma1 ->
+            CoP gamma0' gamma1 gamma ->
+            Hits s gamma0' gamma1' gamma
+  HBoth  :: Select gamma0' s gamma0 -> Select gamma1' s gamma1 ->
+            CoP gamma0 gamma1 gamma ->
+            Hits s gamma0' gamma1' gamma
 
 hits :: CoP gamma0' gamma1' gamma' -> Select gamma' s gamma ->
         Hits s gamma0' gamma1' gamma
-hits (CSS c) Top = HBoth
-hits (CS' c) Top = HLeft (Top :^ lCoP c) (rCoP c)
-hits (C'S c) Top = HRight
+hits (CSS c) Top = HBoth Top Top c 
+hits (CS' c) Top = HLeft Top c
+hits (C'S c) Top = HRight Top c
 hits (CSS c) (Pop x) = case hits c x of
-  HLeft (x :^ r) r' -> HLeft (Pop x :^ OS r) (OS r')
-  HRight -> HRight
-  HBoth  -> HBoth
+  HLeft x c -> HLeft (Pop x) (CSS c)
+  HRight y c -> HRight (Pop y) (CSS c)
+  HBoth x y c -> HBoth (Pop x) (Pop y) (CSS c)
 hits (CS' c) (Pop x) = case hits c x of
-  HLeft (x :^ r) r' -> HLeft (Pop x :^ OS r) (O' r')
-  HRight -> HRight
-  HBoth  -> HBoth
+  HLeft x c -> HLeft (Pop x) (CS' c)
+  HRight y c -> HRight y  (CS' c)
+  HBoth x y c -> HBoth (Pop x) y (CS' c)
 hits (C'S c) (Pop x) = case hits c x of
-  HLeft (x :^ r) r' -> HLeft (x :^ O' r) (OS r')
-  HRight -> HRight
-  HBoth  -> HBoth
-
-{- Clearly, there's more to say here. But no spoilers. -}
-
+  HLeft x c -> HLeft x (C'S c)
+  HRight y c -> HRight (Pop y) (C'S c)
+  HBoth x y c -> HBoth x (Pop y) (C'S c)
 
 ------------------------------------------------------------------------------
 --  relevant data structures
@@ -206,6 +201,9 @@ hits (C'S c) (Pop x) = case hits c x of
 
 data Unit :: Bwd s -> * where
   Void :: Unit B0
+
+void :: Sorted gamma => Unit ^ gamma
+void = Void :^ oN
 
 data (><) :: (Bwd s -> *) -> (Bwd s -> *) -> (Bwd s -> *) where
   Pair :: CoP gamma delta theta -> f gamma -> g delta -> (f >< g) theta
@@ -224,6 +222,9 @@ data (!-) :: s -> (Bwd s -> *) -> (Bwd s -> *) where
   L :: f (gamma :< s) -> (s !- f) gamma
 infixr 9 !-
 
+abstract :: f ^ (gamma :< s) -> (s !- f) ^ gamma
+abstract (f :^ OS r) = L f :^ r
+abstract (f :^ O' r) = K f :^ r
 
 
 
