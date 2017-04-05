@@ -1,0 +1,181 @@
+\documentclass{article}
+\usepackage{a4}
+\usepackage{alltt}
+
+\begin{document}
+
+\title{the {\tt platypus} user guide}
+\author{team platypus}
+\maketitle
+
+
+\section{introduction}
+
+The {\tt platypus} system does not yet exist, but let's write its user guide anyway,
+as that will help us figure out what \emph{should} exist.
+
+Platypus is a rudimentary proof assistant based on constructive type theory, in the
+tradition of the constructive engine. It is
+\begin{description}
+\item[command-driven] using all the user interface technologies of a thoroughly
+  modern paper teletype,
+\item[inconsistent] thanks to type in type,
+\item[European] in the sense that the theory has a notion of \emph{definitional}
+  equality which is computed, and thus a disappointing accident,
+\item[ugly] because its syntax is not exactly s-expressions but in that area
+\end{description}
+and it is all of these things not because they are virtues, but because they are
+cheap.
+
+
+\section{the business is definition}
+
+The point of a {\tt platypus} session is to construct some \emph{definitions} by refinement,
+with intermediate unknowns represented as \emph{holes}.
+
+A definition has
+\begin{description}
+\item[a name] which is some sort of identifier, consisting of nonwhitespace
+  characters other than {\tt (),.}; by convention the character {\tt /} is
+  used to give names a hierarchical structure, so {\tt foo/goo} is the name
+  of {\tt foo}'s {\tt goo};
+\item[a telescope of parameters] which is a type theoretic context; uses of
+  the definition must instantiate the parameters;
+\item[a type];
+\item[a value] which must have the indicated type in the scope of the
+  parameters; values may refer to \emph{holes} if the definition is incomplete
+\end{description}
+
+A hole is like a definition, except that its name ends with {\tt ?} and its value is unknown. As soon as the hole is filled, its usage sites are refined and the hole ceases to exist.
+
+Although names are suggestive of hierarchical structure, we flatten the
+hierarchy into a \emph{state}, which is a sequence of holes and definitions.
+
+What is the syntax of a definition?
+\[
+  \mathit{name}{\tt ,}\;\mathit{body}
+\]
+where
+\[\begin{array}{rrl}
+\mathit{body} & ::= & {\tt =}\;\mathit{term}\;{\tt :}\;\mathit{type} \\
+              &   | & \mathit{type}\;x.\mathit{body} \\
+\end{array}\]
+E.g., one might define a useless identity operation, named {\tt foo} as follows.
+\begin{verbatim}
+  foo, Type X. X x. = x : X
+\end{verbatim}
+
+One can, of course, imagine a nicer syntax.
+
+
+\section{where am I and what can see from there?}
+
+The command prompt looks like
+\[
+  \mathit{prefix}\;\mathit{range}\;{\tt>}
+\]
+where a $\mathit{prefix}$ is either empty or an identifier ending in {\tt /}, and a
+$\mathit{range}$ is either empty or
+\[
+  {\tt (}[\mathit{nameA}]\;\mbox{\tt \^{}}\;[\mathit{nameB}]{\tt )}
+\]
+where either but not both $\mathit{nameX}$ may be omitted.
+The prompt tells us our \emph{field of view}: we can see everything whose name
+has $\mathit{prefix}$ as a prefix and which comes strictly between $\mathit{prefix}{\tt /}\mathit{nameA}$ and $\mathit{prefix}{\tt /}\mathit{nameB}$. If the prefix is nonempty, there should be something whose name begins with it. Likewise the range endpoints should be
+names of actual things.
+
+Before the prompt is issued, you will see a display of all the things in the field of view. The bodies of definitions whose names are strictly longer than the prefix are suppressed.
+The display will give only the suffix of the name, to save space.
+If the prefix is $\mathit{blah}{\tt /}$ for some definition $\mathit{blah}$, the body
+of the definition will be displayed.
+
+A hole is displayed as a vertical context, followed by a line of dashes, followed by
+the name suffix, a {\tt :} and the hole's type. E.g.,
+\begin{verbatim}
+  X : Type
+  x : X
+----------------
+id? : X
+
+>
+\end{verbatim}
+
+Some time earlier, you might have typed at the prompt {\tt >}
+\begin{verbatim}
+> id, = ? : Pi Type X. Pi X x. X
+\end{verbatim}
+which would result in the display.
+\begin{verbatim}
+------------------------------
+id? : Pi Type X. Pi X x. X
+
+------------------------------
+id : Pi Type X. Pi X x. X
+
+>
+\end{verbatim}
+and you might then have typed
+\begin{verbatim}
+> = \ X. \ x. ?
+\end{verbatim}
+which would result in the goal display above.
+
+Your primary means of not getting bombarded with too much information is thus
+to lengthen the prompt. The command
+\[
+\mathit{suffix}\;{\tt /}
+\]
+will add $\mathit{suffix}{\tt /}$ to the prompt prefix. It is forbidden
+to have a nonempty prefix which refers to nothing in the context.
+
+Meanwhile, the command
+\[
+{\tt <}
+\]
+will shorten the prompt to its penultimate {\tt /}, or to empty if there is at most
+one {\tt /}.
+
+The command `zoom out to $\mathit{name}$'
+\[
+{\tt <}\;\mathit{name}
+\]
+will change the prefix to its longest proper subsequence ending in
+${\tt /}\mathit{name}{\tt /}$
+if there is such a thing.
+
+The command {\tt <<} zooms all the way out to the root.
+
+Your secondary means of not being bombarded with too much information is to narrow
+the range with the command
+\[
+\mathit{name}\;\mbox{\tt \^{}}\;\mathit{name}'
+\]
+which means `show me only the things between the two names'. You may omit either end
+to mean `show me from the beginning' or `show me to the end'. You can use this also to
+widen your view. In particular, the command
+\[
+\mbox{\tt \^{}}
+\]
+means `show everything'.
+
+But where am I? If I make a definition, where will it go? I am just before
+the first hole in my field of view (which means that if there is no such hole, I am at the
+end of what I can see. So, viewing range restrictions let us insert definitions
+before the end of the state.
+
+
+
+\newpage\appendix
+
+\section{Command Cheatsheet}
+
+\[\begin{array}{ll}
+{\tt =}\;\mathit{term} & \mbox{give a refinement} \smallskip\\
+
+\mathit{name}\;{\tt /} & \mbox{zoom prefix in to name}\\
+{\tt <}\;[\mathit{name}] & \mbox{zoom prefix out [to name]}\\
+{\tt <<} & \mbox{zoom prefix all the way out}\\
+{}[\mathit{name}]\;\mbox{\tt \^{}}\;[\mathit{name}] & \mbox{set the range}\\
+\end{array}\]
+
+\end{document}
