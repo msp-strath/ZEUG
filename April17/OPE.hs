@@ -21,6 +21,16 @@ data (<=) :: Bwd s -> Bwd s -> * where
   OS :: gamma <= delta -> (gamma :< s) <= (delta :< s)
   O' :: gamma <= delta -> gamma <= (delta :< s)
 
+opeEq :: gamma <= theta -> delta <= theta -> Maybe (gamma == delta)
+opeEq OZ     OZ      = Just Refl
+opeEq (OS r) (OS r') = do
+  Refl <- opeEq r r'
+  return Refl
+opeEq (O' r) (O' r') = do
+  Refl <- opeEq r r'
+  return Refl
+opeEq _ _ = Nothing
+
 -- composition
 (-<=-) :: delta <= theta -> gamma <= delta -> gamma <= theta
 OZ   -<=- OZ    = OZ
