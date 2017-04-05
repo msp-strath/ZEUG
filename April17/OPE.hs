@@ -21,16 +21,6 @@ data (<=) :: Bwd s -> Bwd s -> * where
   OS :: gamma <= delta -> (gamma :< s) <= (delta :< s)
   O' :: gamma <= delta -> gamma <= (delta :< s)
 
-opeEq :: gamma <= theta -> delta <= theta -> Maybe (gamma == delta)
-opeEq OZ     OZ      = Just Refl
-opeEq (OS r) (OS r') = do
-  Refl <- opeEq r r'
-  return Refl
-opeEq (O' r) (O' r') = do
-  Refl <- opeEq r r'
-  return Refl
-opeEq _ _ = Nothing
-
 -- composition
 (-<=-) :: delta <= theta -> gamma <= delta -> gamma <= theta
 OZ   -<=- OZ    = OZ
@@ -95,6 +85,11 @@ Morally, things-with-thinning is a MonadIx, with
 Again, however, the need for a Sorted constraint messes that up.
 -}
 
+wk :: f ^ gamma -> f ^ (gamma :< s)
+wk (f :^ r) = f :^ O' r
+
+(^^) :: f ^ gamma -> gamma <= delta -> f ^ delta
+(f :^ r) ^^ r' = f :^ r' -<=- r
 
 ------------------------------------------------------------------------------
 --  coproduct of slice
@@ -244,3 +239,40 @@ dive :: (s !- f) ^ gamma -> f ^ (gamma :< s)
 dive (K f :^ r) = f :^ O' r
 dive (L _ f :^ r) = f :^ OS r
 
+------------------------------------------------------------------------------
+-- Equality testing
+------------------------------------------------------------------------------
+
+opeEq :: gamma <= theta -> delta <= theta -> Maybe (gamma == delta)
+opeEq OZ     OZ      = Just Refl
+opeEq (OS r) (OS r') = do
+  Refl <- opeEq r r'
+  return Refl
+opeEq (O' r) (O' r') = do
+  Refl <- opeEq r r'
+  return Refl
+opeEq _ _ = Nothing
+
+class SyntaxEq (f :: Bwd s -> *) where
+  eq :: f gamma -> f gamma -> Maybe ()
+
+instance SyntaxEq f => SyntaxEq ((^) f) where
+  eq (f :^ r) (g :^ r') = do
+    Refl <- opeEq r r'
+    eq f g
+
+instance SyntaxEq Unit where
+  eq _ _ = return ()
+
+instance (SyntaxEq f, SyntaxEq g) => SyntaxEq (f >< g) where
+  eq (Pair c f g) (Pair c' f' g') = do
+    eq (f :^ lCoP c) (f' :^ lCoP c')
+    eq (g :^ rCoP c) (g' :^ rCoP c')
+
+instance SyntaxEq (This s) where
+  eq _ _ = return ()
+
+instance SyntaxEq f => SyntaxEq (s !- f) where
+  eq (K t) (K t') = eq t t'
+  eq (L _ t) (L _ t') = eq t t'
+  eq _ _ = fail "gotcha"

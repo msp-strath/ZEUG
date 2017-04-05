@@ -48,6 +48,8 @@ data Term :: Sort -> (Bwd Sort -> *) where
 star :: Sorted gamma => Term Chk ^ gamma
 star = Star Void :^ oN
 
+freshVar :: Sorted gamma => Term Chk ^ (gamma :< Syn)
+freshVar = E (V It) :^ OS oN
 
 ------------------------------------------------------------------------------
 -- hereditary substitution
@@ -59,6 +61,9 @@ class Sub (f :: Bwd Sort -> *) where
 data Radical :: Sort -> Bwd Sort -> * where
   (:::) :: Term Chk ^ delta -> Term Chk ^ delta -> Radical Syn delta
 infixr 3 :::
+
+radTm :: Radical Syn gamma -> Term Chk ^ gamma
+radTm (t ::: _) = t
 
 -- We substitute a radical for a variable. Radicals can cause computation.
 
@@ -99,9 +104,10 @@ instance (Sub f , Sub g) => Sub (f >< g) where
 -- structural rule for binding
 instance Sub f => Sub (s !- f) where
   sub (K f) xr s = mapIx K $ sub f xr s
-  sub (L y f) (x :^ r) s = abstract y (sub f (Pop x :^ OS r) (radW s)) where
-    radW :: Radical t gamma -> Radical t (gamma :< s)
-    radW (t :^ r ::: _T :^ _R) = t :^ O' r ::: _T :^ O' _R
+  sub (L y f) (x :^ r) s = abstract y (sub f (Pop x :^ OS r) (radWk s))
+
+radWk :: Radical t gamma -> Radical t (gamma :< s)
+radWk (t ::: _T) = wk t ::: wk _T
 
 
 ------------------------------------------------------------------------------
@@ -143,9 +149,22 @@ data Sorty :: Sort -> * where
   Syny :: Sorty Syn
   Pnty :: Sorty Pnt
 
+------------------------------------------------------------------------------
+-- Equality testing
+------------------------------------------------------------------------------
+
 sortEq :: Sorty s -> Sorty s' -> Maybe (s == s')
 sortEq Chky Chky = Just Refl
 sortEq Syny Syny = Just Refl
 sortEq Pnty Pnty = Just Refl
 sortEq _    _    = Nothing
+
+instance SyntaxEq (Term s) where
+  eq (Star t) (Star t') = eq t t' 
+  eq (Pi   t) (Pi   t') = eq t t'
+  eq (Lam  t) (Lam  t') = eq t t'
+  eq (E    t) (E    t') = eq t t'
+  eq (V    t) (V    t') = eq t t'
+  eq (App  t) (App  t') = eq t t'
+  eq _        _         = fail "gotcha"
   
