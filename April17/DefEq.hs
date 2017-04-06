@@ -7,21 +7,6 @@ import Utils
 import OPE
 import Kernel
 
-data Context :: Bwd Sort -> * where
-  C0 :: Context B0
-  (:\) :: Sorted gamma =>
-          Context gamma -> (Sorty s , String , Info s ^ gamma) ->
-          Context (gamma :< s)
-
-type family Info (s :: Sort) :: Bwd Sort -> * where
-  Info Syn = Term Chk
-  Info Chk = Got Void
-  Info Pnt = Got ()
-
-lookupC :: Context gamma -> (B0 :< s) <= gamma -> Info s ^ gamma
-lookupC (_ :\ (_,_,i)) (OS _) = wk i
-lookupC (gamma :\ _) (O' r) = wk (lookupC gamma r)
-                                  
 
 etaExpand :: Sorted gamma =>
              Context gamma -> Radical Syn gamma -> Term Chk ^ gamma
@@ -48,7 +33,6 @@ neutExpand gamma (App fs :^ r) = fs :^ r >^< \f s ->
     (f , Pi _ST :^ _R) -> _ST :^ _R >^< \_S _T ->
       (mapIx App (pair f (etaExpand gamma (s ::: _S))),
        instantiate _T  (s ::: _S))
-  
 
 defEq :: Sorted gamma =>
          Context gamma ->

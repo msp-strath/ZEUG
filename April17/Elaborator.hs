@@ -65,4 +65,4 @@ spine gamma _ _ = fail "raised eyebrow"
          
 -- render N0 <$> (chk C0 (Star Void :^ OZ) =<< rawString "Pi Type X. Pi X x. X")
 -- let Just idtype = (chk C0 (Star Void :^ OZ) =<< rawString "Pi Type X. Pi X x. X")
--- chk C0 idtype =<< rawString "\\ X. \\ x. x"
+-- render N0 <$> (chk C0 idtype =<< rawString "\\ X. \\ x. x")

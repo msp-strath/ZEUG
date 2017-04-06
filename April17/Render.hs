@@ -7,7 +7,7 @@ import OPE
 import Raw
 import Kernel
 
-type Namings gamma = Env gamma String
+type Namings gamma = NameEnv gamma String
 
 renderBinder :: Namings gamma -> (s !- Term Chk) ^ gamma -> Raw
 renderBinder ns (K t :^ r) = render ns (t :^ r)
