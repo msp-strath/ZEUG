@@ -28,6 +28,60 @@ and it is all of these things not because they are virtues, but because they are
 cheap.
 
 
+\section{the syntax of everything}
+
+We have a universal syntax.
+\[\begin{array}{rrll}
+\mathit{thing} & ::= & \mathit{atom}
+  & \mbox{nonempty sequence of nonspace chars bar {\tt .,()}}\\
+               &   | & \mathit{atom}.\,\mathit{thing}
+  & \mbox{binding}\\
+               &   | & \mathit{thing}\;\mathit{thing}+
+  & \mbox{clump of two or more things} \\
+               &   | & {\tt (}\mathit{thing}{\tt )}
+  & \mbox{parentheses for disambiguation} \\
+\end{array}\]
+You \emph{may} insert parentheses for disambiguation anywhere. You
+\emph{must} use them to wrap a binding or a clump which is not the
+last thing in another clump. You need not wrap in parentheses a
+binding that stands last in a clump. So
+\[
+  f\;x.\,a\; b\;\;\mbox{means}\;\;(f\;(x.\,(a\; b))) \qquad
+  f\;(x.\,a)\; b\;\;\mbox{means}\;\;(f\;(x.\,a)\; b)
+\]
+If a clump stands last in a clump, you may omit the parentheses
+around the inner clump if you insert a {\tt ,} before it. So
+\[
+ a\;b\;c,\,d\;e\;f\;\;\mbox{means}\;\;(a\;b\;c\;(d\;e\;f))
+\]
+In this way, as in the 1950s, right-nested things flatten into
+list-like things. We will also be predisposed to make binding
+constructs put their binding last. E.g., dependent function types
+look like
+\[
+  {\tt Pi}\;S\;x.\,T
+\]
+and a big long telescope of such things is
+\[
+  {\tt Pi}\;S_0\;x_0.\,{\tt Pi}\;S_1\;x_1.\,\cdots {\tt Pi}\;S_n\;x_n.\, T
+\]
+Degenerate vacuous binding is indicated by \emph{not binding}, rather
+than binding an underscore or some such. So for a nondependent
+function
+type, we have
+\[
+  {\tt Pi}\;S_0,\,{\tt Pi}\;S_1,\,\cdots {\tt Pi}\;S_n\; T
+\]
+
+We use this syntax for everything, including commands typed in the
+shell. You may not type a syntax error (but, of course, you may make
+use of this syntax in meaningless ways). When you hit enter, your
+input so far is presumed complete if it parses. If, however, the
+parser still awaits more text (usually a {\tt )}) to form valid input,
+you will be prompted to supply it. So, you can give a multi-line
+clump as a command if you take the precaution to begin it with {\tt (}.
+
+
 \section{the business is definition}
 
 The point of a {\tt platypus} session is to construct some \emph{definitions} by refinement,
@@ -65,7 +119,8 @@ E.g., one might define a useless identity operation, named {\tt foo} as follows.
   foo, Type X. X x. = x : X
 \end{verbatim}
 
-One can, of course, imagine a nicer syntax.
+One can, of course, imagine a nicer syntax. (A body is always a
+\emph{clump}, hence the comma.)
 
 
 \section{where am I and what can see from there?}
@@ -74,7 +129,8 @@ The command prompt looks like
 \[
   \mathit{prefix}\;\mathit{range}\;{\tt>}
 \]
-where a $\mathit{prefix}$ is either empty or an identifier ending in {\tt /}, and a
+where a $\mathit{prefix}$ is either empty or an identifier (typically
+a pathlike sequence of ${\tt /}\mathit{name}$ blocks), and a
 $\mathit{range}$ is either empty or
 \[
   {\tt (}[\mathit{nameA}]\;\mbox{\tt \^{}}\;[\mathit{nameB}]{\tt )}
@@ -86,19 +142,32 @@ names of actual things.
 
 Before the prompt is issued, you will see a display of all the things in the field of view. The bodies of definitions whose names are strictly longer than the prefix are suppressed.
 The display will give only the suffix of the name, to save space.
-If the prefix is $\mathit{blah}{\tt /}$ for some definition $\mathit{blah}$, the body
-of the definition will be displayed.
-
-A hole is displayed as a vertical context, followed by a line of dashes, followed by
-the name suffix, a {\tt :} and the hole's type. E.g.,
+A hole (whose name is $\mathit{prefix}{\tt /}\mathit{suffix}{\tt ?}$is
+displayed as a vertical context, followed by a line of dashes, followed by
+the name $\mathit{suffix}{\tt ?}$, a {\tt :} and the hole's type. E.g.,
 \begin{verbatim}
   X : Type
   x : X
 ----------------
-id? : X
+  id/body? : X
 
 >
 \end{verbatim}
+
+A definition whose name is strictly longer than the prefix will have
+its value suppressed, but its context and type will be displayed in
+the same format as a goal (but with no {\tt ?}). A definition whose
+name is exactly the prefix will have 
+If the prefix is $\mathit{blah}$ for some definition $\mathit{blah}$, the body
+of the definition will be displayed, instead of the (empty)name
+suffix. We might hope to arrive at the following
+\begin{verbatim}
+  X : Type
+  x : X
+--------------------------------------
+  (\, \x . x) : Pi Type X. Pi X x. X
+\end{verbatim}
+
 
 Some time earlier, you might have typed at the prompt {\tt >}
 \begin{verbatim}
@@ -116,16 +185,16 @@ id : Pi Type X. Pi X x. X
 \end{verbatim}
 and you might then have typed
 \begin{verbatim}
-> = \ X. \ x. ?
+> = \ X. \ x. ?body
 \end{verbatim}
 which would result in the goal display above.
 
 Your primary means of not getting bombarded with too much information is thus
 to lengthen the prompt. The command
 \[
-\mathit{suffix}\;{\tt /}
+{\tt /}\;\mathit{suffix}\;
 \]
-will add $\mathit{suffix}{\tt /}$ to the prompt prefix. It is forbidden
+will add ${\tt /}\mathit{suffix}$ to the prompt prefix. It is forbidden
 to have a nonempty prefix which refers to nothing in the context.
 
 Meanwhile, the command
