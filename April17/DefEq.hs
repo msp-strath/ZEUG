@@ -9,7 +9,7 @@ import Kernel
 
 
 etaExpand :: Sorted gamma =>
-             Context gamma -> Radical Syn gamma -> Term Chk ^ gamma
+             Context gamma -> Radical gamma Syn -> Term Chk ^ gamma
 etaExpand gamma f@(_ ::: Pi _ST :^ _R) = _ST :^ _R >^< \_S _T ->
   mapIx Lam $ abstract "YKW" (etaExpand (gamma :\ (Syny,"YKW",_S)) 
                                         (app (radWk f) freshVar))

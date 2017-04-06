@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs, DataKinds, TypeOperators, KindSignatures,
              ConstraintKinds, RankNTypes, FlexibleInstances,
              TypeFamilies, StandaloneDeriving, DeriveFoldable,
-             DeriveFunctor, DeriveTraversable #-}
+             DeriveFunctor, DeriveTraversable, FlexibleContexts #-}
 module Kernel where
 
 import Prelude hiding ((^^))
@@ -92,67 +92,89 @@ freshVar = E (V It) :^ OS oN
 ------------------------------------------------------------------------------
 
 class Sub (f :: Bwd Sort -> *) where
-  sub :: f gamma' -> Select gamma' s ^ delta -> Radical s delta -> f ^ delta
-  solve :: f gamma -> Meta delta s -> Instance s ^ delta -> f ^ gamma
-    
-data Radical :: Sort -> Bwd Sort -> * where
-  (:::) :: Term Chk ^ delta -> Term Chk ^ delta -> Radical Syn delta
-  RP    :: Term Pnt ^ delta -> Radical Pnt delta
+  sub' :: f gamma' ->
+          Select gamma' theta ^ delta -> ALL (Radical delta) theta ->
+          f ^ delta
+  solve :: Sorted gamma =>
+           f gamma -> Meta delta s -> Instance s ^ delta -> f ^ gamma
+
+sub :: Sub f =>
+       f gamma' -> Select gamma' theta ^ delta -> ALL (Radical delta) theta ->
+       f ^ delta
+sub f (s :^ r) A0 = case missAll s of Refl -> f :^ r
+sub f s gamma = sub' f s gamma
+
+data Radical :: Bwd Sort -> Sort -> * where
+  (:::) :: Term Chk ^ delta -> Term Chk ^ delta -> Radical delta Syn
+  RP    :: Term Pnt ^ delta -> Radical delta Pnt
 infixr 3 :::
 
-radTm :: Radical Syn gamma -> Term Chk ^ gamma
+radTm :: Radical gamma Syn -> Term Chk ^ gamma
 radTm (t ::: _) = t
 
-mkRadical :: Sorty s -> Instance s ^ gamma -> Info s ^ gamma -> Radical s gamma
+mkRadical :: Sorty s -> Instance s ^ gamma -> Info s ^ gamma -> Radical gamma s
 mkRadical Syny (IS t :^ r) _T = t :^ r ::: _T
 mkRadical Pnty (IP p :^ r) _  = RP $ p :^ r
 
+data Subst :: Bwd Sort -> Bwd Sort -> * where
+
 -- We substitute a radical for a variable. Radicals can cause computation.
 instance Sub (Term Chk) where
-  sub (Pi _ST) xr s = mapIx Pi $ sub _ST xr s
-  sub (Lam t)  xr s = mapIx Lam $ sub t xr s
-  sub (E e)    xr s = stop $ subSyn e xr s
+  sub' (Pi _ST) xr s = mapIx Pi $ sub' _ST xr s
+  sub' (Lam t)  xr s = mapIx Lam $ sub' t xr s
+  sub' (E e)    xr s = stop $ subSyn e xr s
 
   solve (Pi _ST) m s = mapIx Pi $ solve _ST m s
   solve (Lam t)  m s = mapIx Lam $ solve t m s
   solve (E e)    m s = stop $ solveSyn e m s
 
 -- substitution in a Term Syn can radicalise it
-type Activist s delta = Either (Radical s delta) (Term s ^ delta)
+type Activist s delta = Either (Radical delta s) (Term s ^ delta)
 
 subSyn :: Term Syn gamma' ->
-          Select gamma' s ^ delta -> Radical s delta ->
+          Select gamma' theta ^ delta -> ALL (Radical delta) theta ->
           Activist Syn delta
-subSyn (V It) (Top :^ r) s = Left s
-subSyn (App (Pair c f a)) (z :^ r) s = case hits c z of
-    HRight  y c -> Right . mapIx App $  -- right hit means no radical
-      pair (f :^ r -<=- lCoP c) (sub a (y :^ r -<=- rCoP c) s)
-      -- left hit means risk of radical
-    HLeft x   c ->
-      radicalAct (subSyn f (x :^ r -<=- lCoP c) s) (a :^ r -<=- rCoP c)
-    HBoth x y c ->
-      radicalAct (subSyn f (x :^ r -<=- lCoP c) s)
-                 (sub a (y :^ r -<=- rCoP c) s)
+subSyn t (s :^ r) A0 = case missAll s of Refl -> Right $ t :^ r
+subSyn (V It) (Hit None :^ r) (AS A0 s) = Left s
+subSyn (App (Pair c f a)) (z :^ r) theta = case hits z c of
+    Hits z0 z1 ctheta cgamma ->
+      let theta0 = discard (lCoP ctheta) theta
+          theta1 = discard (rCoP ctheta) theta
+          r0 = r -<=- lCoP cgamma
+          r1 = r -<=- rCoP cgamma
+      in radicalAct (subSyn f (z0 :^ r0) theta0) (sub a (z1 :^ r1) theta1)
 
 subSyn (Hole meta gamma) xr s = Right (mapIx (Hole meta) (sub gamma xr s))
 
-solveSyn :: Term Syn gamma -> Meta delta s -> Instance s ^ delta ->
+solveSyn :: Sorted gamma =>
+            Term Syn gamma -> Meta theta s -> Instance s ^ theta ->
             Activist Syn gamma 
 solveSyn (V It) _ _ = Right (V It :^ oI)
-solveSyn (App (Pair c f a)) m s =
+solveSyn (App (Pair c f a)) m s = sortedCoP c $
   radicalAct (thinActivist (solveSyn f m s) (lCoP c))
              (solve a m s ^^ rCoP c)
-solveSyn (Hole m' delta) m s = case (metaEq m' m , solve delta m s) of
-  (Just (Refl,Refl), delta) -> 
-    Left $ subs (mkRadical Syny s (metaInfo m)) (metaContext m) delta
-  (Nothing, delta :^ r) -> Right $ Hole m' delta :^ r
+solveSyn (Hole m' theta) m@(Meta _ _ _Theta (_T :^ _R)) s@(t :^ r) =
+  case (metaEq m' m , solve theta m s, t) of
+    (Just (Refl,Refl), theta :^ r' , IS t) ->
+      sortedObj r $ sortedObj _R $ sortedObj r' $ Left $
+        let fs = zippy _Theta (theta :^ r')
+        in sub t (hitter :^ oN) (discard r fs) :::
+             sub _T (hitter :^ oN) (discard _R fs)
+    (Nothing, theta :^ r, _) -> Right $ Hole m' theta :^ r
 
-subs :: Radical s delta -> Context delta -> Env delta ^ gamma -> Radical s gamma
-subs f C0 (E0 Void :^ r) = thinRadical f r
-subs f (_Delta :\ (_,_,_I)) (ES p :^ r) = p :^ r >^< \delta i ->
-  undefined
+zippy :: Context theta -> Env theta ^ gamma -> ALL (Radical gamma) theta
+zippy C0 (E0 Void :^ r) = A0
+zippy (_Theta :\ (s,_,_I :^ _R)) (ES p :^ r) = p :^ r >^< \theta i ->
+  let fs = zippy _Theta theta
+  in sortedObj _R $ sortedObj r $
+       AS fs (mkRadical s i (subInfo s $ sub _I (hitter :^ oN) (discard _R fs)))
 
-thinRadical :: Radical s delta -> delta <= delta' -> Radical s delta'
+subInfo :: Sorty s -> Holds (Sub (Info s))
+subInfo Syny t = t
+subInfo Chky t = t
+subInfo Pnty t = t
+
+thinRadical :: Radical delta s -> delta <= delta' -> Radical delta' s
 thinRadical (t ::: _T) r = t ^^ r ::: _T ^^ r
 thinRadical (RP p) r = RP (p ^^ r)
                                           
@@ -169,41 +191,53 @@ stop :: Activist Syn delta -> Term Chk ^ delta
 stop (Left t) = radTm t
 stop (Right e) = mapIx E e
 
+instance Sub Unit where
+  sub' Void (None :^ r) A0 = Void :^ r
+  solve Void _ _ = Void :^ oN
+  
+instance Sub (Got Void) where
+  sub' (Got z) = Data.Void.absurd z
+  solve (Got z) = Data.Void.absurd z
+
 -- structural rule for pairing
 instance (Sub f , Sub g) => Sub (f >< g) where
-  sub (Pair c f g) (z :^ r) s = case hits c z of
-    HLeft  x c -> pair (sub f (x :^ r -<=- lCoP c) s) (g :^ r -<=- rCoP c)
-    HRight y c -> pair (f :^ r -<=- lCoP c) (sub g (y :^ r -<=- rCoP c) s)
-    HBoth  x y c ->
-      pair (sub f (x :^ r -<=- lCoP c) s) (sub g (y :^ r -<=- rCoP c) s)
+  sub' (Pair c f g) (z :^ r) theta = case hits z c of
+    Hits z0 z1 ctheta cgamma ->
+      let theta0 = discard (lCoP ctheta) theta
+          theta1 = discard (rCoP ctheta) theta
+          r0 = r -<=- lCoP cgamma
+          r1 = r -<=- rCoP cgamma
+      in pair (sub f (z0 :^ r0) theta0) (sub g (z1 :^ r1) theta1)
 
-  solve (Pair c f g) m s = pair (solve f m s ^^ lCoP c) (solve g m s ^^ rCoP c)
+  solve (Pair c f g) m s = sortedCoP c $
+    pair (solve f m s ^^ lCoP c) (solve g m s ^^ rCoP c)
 
 -- structural rule for binding
 instance Sub f => Sub (s !- f) where
-  sub (K f) xr s = mapIx K $ sub f xr s
-  sub (L y f) (x :^ r) s = abstract y (sub f (Pop x :^ OS r) (radWk s))
+  sub' (K f) xr theta = mapIx K $ sub' f xr theta
+  sub' (L y f) (x :^ r) theta =
+    abstract y (sub' f (Miss x :^ OS r) (mapIx radWk theta))
 
   solve (K f) m s = mapIx K $ solve f m s
   solve (L y f) m s = abstract y (solve f m s)
 
-radWk :: Radical t gamma -> Radical t (gamma :< s)
+radWk :: Radical gamma t -> Radical (gamma :< s) t
 radWk (t ::: _T) = wk t ::: wk _T
 
 instance Sub (Env delta) where
-  sub (ES p) xr s = mapIx ES (sub p xr s)
+  sub' (ES p) xr s = mapIx ES (sub' p xr s)
 
   solve (ES p) m s = mapIx ES (solve p m s)
 
 instance Sub (Instance s) where
-  sub (IS t) xr s = mapIx IS (sub t xr s)
-  sub (IP p) xr s = mapIx IP (sub p xr s)
+  sub' (IS t) xr s = mapIx IS (sub' t xr s)
+  sub' (IP p) xr s = mapIx IP (sub' p xr s)
 
   solve (IS t) m s = mapIx IS (solve t m s)
   solve (IP p) m s = mapIx IP (solve p m s)
 
 instance Sub (Term Pnt) where
-  sub (Hole meta gamma) xr s = mapIx (Hole meta) (sub gamma xr s)
+  sub' (Hole meta gamma) xr s = mapIx (Hole meta) (sub' gamma xr s)
   -- TODO worry here
 
   solve (Hole m' gamma) m s = mapIx (Hole m') (solve gamma m s)
@@ -213,17 +247,17 @@ instance Sub (Term Pnt) where
 -- computation is the elimination of radicals
 ------------------------------------------------------------------------------
 
-app :: Radical Syn delta -> Term Chk ^ delta -> Radical Syn delta
+app :: Radical delta Syn -> Term Chk ^ delta -> Radical delta Syn
 app (f :^ r ::: Pi _ST :^ _R) s = _ST :^ _R >^< \ _S _T ->
   (case f of
     E e   -> mapIx (E . App) (pair (e :^ r) s)
     Lam t -> instantiate (t :^ r) (s ::: _S)
   ) ::: instantiate _T (s ::: _S)
   
-instantiate :: (s !- Term Chk) ^ delta -> Radical s delta ->
+instantiate :: (s !- Term Chk) ^ delta -> Radical delta s ->
                Term Chk ^ delta
 instantiate (K t :^ r) _ = t :^ r
-instantiate (L _ t :^ r) a = sub t (Top :^ r) a
+instantiate (L _ t :^ r) a = sortedObj r $ sub t (Hit misser :^ r) (AS A0 a)
                                   
 ------------------------------------------------------------------------------
 -- environments of the unremarkable kind

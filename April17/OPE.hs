@@ -32,19 +32,30 @@ infixr 9 -<=-
 class Sorted (gamma :: Bwd s) where
   oI :: gamma <= gamma    -- identity
   oN :: B0    <= gamma    -- initiality
+  misser :: Select gamma B0 gamma
+  hitter :: Select gamma gamma B0
 
 instance Sorted B0 where
   oI = OZ
   oN = OZ
+  misser = None
+  hitter = None
 
 instance Sorted gamma => Sorted (gamma :< s) where
   oI = OS oI
   oN = O' oN
+  misser = Miss misser
+  hitter = Hit hitter
 
 sortedObj :: gamma <= delta -> Holds (Sorted gamma, Sorted delta)
 sortedObj OZ t = t
 sortedObj (OS r) t = sortedObj r t
 sortedObj (O' r) t = sortedObj r t
+
+discard :: gamma <= delta -> ALL p delta -> ALL p gamma
+discard OZ A0 = A0
+discard (OS r) (AS ps p) = AS (discard r ps) p
+discard (O' r) (AS ps _) = discard r ps
 
 {-
 One wart here is that while every object has an identity, runtime knowledge
@@ -117,6 +128,10 @@ rCoP (CSS c) = OS (rCoP c)
 rCoP (CS' c) = O' (rCoP c)
 rCoP (C'S c) = OS (rCoP c)
 
+sortedCoP :: CoP gamma delta theta ->
+             Holds (Sorted gamma, Sorted delta, Sorted theta)
+sortedCoP c t = sortedObj (lCoP c) $ sortedObj (rCoP c) t
+
 -- Given two embeddings which may not cover their shared codomain,
 -- we may compute that part of their codomain which they *do* cover,
 -- together with its embedding into the whole.
@@ -163,40 +178,44 @@ r0 and r1.
 --  selections
 ------------------------------------------------------------------------------
 
+
+{-
 -- Select gamma s delta means that removing s from gamma leaves delta
 data Select :: Bwd s -> s -> Bwd s -> * where
   Top  :: Select (gamma :< s) s gamma
   Pop  :: Select gamma s delta -> Select (gamma :< t) s (delta :< t)
+-}
 
--- selections interact with coproducts to tell us where to find the selected
-data Hits :: s -> Bwd s -> Bwd s -> Bwd s -> * where
-  HLeft  :: Select gamma0' s gamma0 ->
-            CoP gamma0 gamma1' gamma ->
-            Hits s gamma0' gamma1' gamma
-  HRight ::                            Select gamma1' s gamma1 ->
-            CoP gamma0' gamma1 gamma ->
-            Hits s gamma0' gamma1' gamma
-  HBoth  :: Select gamma0' s gamma0 -> Select gamma1' s gamma1 ->
-            CoP gamma0 gamma1 gamma ->
-            Hits s gamma0' gamma1' gamma
+data Select :: Bwd s -> Bwd s -> Bwd s -> * where
+  None :: Select B0 B0 B0
+  Hit :: Select gamma' delta gamma -> Select (gamma' :< s) (delta :< s) gamma
+  Miss :: Select gamma' delta gamma -> Select (gamma' :< s) delta (gamma :< s)
 
-hits :: CoP gamma0' gamma1' gamma' -> Select gamma' s gamma ->
-        Hits s gamma0' gamma1' gamma
-hits (CSS c) Top = HBoth Top Top c 
-hits (CS' c) Top = HLeft Top c
-hits (C'S c) Top = HRight Top c
-hits (CSS c) (Pop x) = case hits c x of
-  HLeft x c -> HLeft (Pop x) (CSS c)
-  HRight y c -> HRight (Pop y) (CSS c)
-  HBoth x y c -> HBoth (Pop x) (Pop y) (CSS c)
-hits (CS' c) (Pop x) = case hits c x of
-  HLeft x c -> HLeft (Pop x) (CS' c)
-  HRight y c -> HRight y  (CS' c)
-  HBoth x y c -> HBoth (Pop x) y (CS' c)
-hits (C'S c) (Pop x) = case hits c x of
-  HLeft x c -> HLeft x (C'S c)
-  HRight y c -> HRight (Pop y) (C'S c)
-  HBoth x y c -> HBoth x (Pop y) (C'S c)
+data Hits :: Bwd s -> Bwd s -> Bwd s -> Bwd s -> * where
+  Hits :: Select gamma0' theta0 gamma0 -> Select gamma1' theta1 gamma1 ->
+          CoP theta0 theta1 theta -> CoP gamma0 gamma1 gamma ->
+          Hits gamma0' gamma1' theta gamma
+
+hits :: Select gamma' theta gamma -> CoP gamma0' gamma1' gamma' ->
+        Hits  gamma0' gamma1' theta gamma
+hits None CZZ = Hits None None CZZ CZZ
+hits (Miss s) (CSS c) = case hits s c of
+  Hits s0 s1 ctheta cgamma -> Hits (Miss s0) (Miss s1) ctheta (CSS cgamma)
+hits (Miss s) (CS' c) = case hits s c of
+  Hits s0 s1 ctheta cgamma -> Hits (Miss s0) s1 ctheta (CS' cgamma)
+hits (Miss s) (C'S c) = case hits s c of
+  Hits s0 s1 ctheta cgamma -> Hits s0 (Miss s1) ctheta (C'S cgamma)
+hits (Hit s) (CSS c) = case hits s c of
+  Hits s0 s1 ctheta cgamma -> Hits (Hit s0) (Hit s1) (CSS ctheta) cgamma
+hits (Hit s) (CS' c) = case hits s c of
+  Hits s0 s1 ctheta cgamma -> Hits (Hit s0) s1 (CS' ctheta) cgamma
+hits (Hit s) (C'S c) = case hits s c of
+  Hits s0 s1 ctheta cgamma -> Hits s0 (Hit s1) (C'S ctheta) cgamma
+
+missAll :: Select gamma' B0 gamma -> gamma' == gamma
+missAll None = Refl
+missAll (Miss s) = case missAll s of Refl -> Refl
+
 
 ------------------------------------------------------------------------------
 --  relevant data structures

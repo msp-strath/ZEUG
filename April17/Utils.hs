@@ -64,7 +64,7 @@ velemIndex' x n (VCons x' xs) =
   else
     fmap FSuc (velemIndex' x n xs)
 
--- utilities
+-- bwd utilities
 data Bwd x = B0 | Bwd x :< x deriving Functor
 
 bmap :: (a -> b) -> Bwd a -> Bwd b
@@ -83,6 +83,13 @@ xs <>< []       = xs
 B0        <>> ys = ys
 (xs :< x) <>> ys = xs <>> (x : ys)
 
+data ALL :: (s -> *) -> Bwd s -> * where
+  A0 :: ALL p B0
+  AS :: ALL p gamma -> p s -> ALL p (gamma :< s)
+
+instance FunctorIx ALL where
+  mapIx f A0 = A0
+  mapIx f (AS ps p) = AS (mapIx f ps) (f p)
 
 -- nonempty lists
 data NEL x = x :- Maybe (NEL x)
@@ -223,3 +230,4 @@ type Holds c = forall t . (c => t) -> t
 
 data (==) :: k -> k -> * where
   Refl :: x == x
+

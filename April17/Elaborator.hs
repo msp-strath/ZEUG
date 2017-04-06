@@ -43,7 +43,7 @@ fetch (gamma :\ (s',y,i :^ r)) s x =
 
 syn :: Sorted gamma =>
        Context gamma -> Raw ->
-       Maybe (Radical Syn gamma)
+       Maybe (Radical gamma Syn)
 syn gamma (RA x) = do
   (x , _S) <- fetch gamma Syny x
   return (mapIx (E . V) x ::: _S)
@@ -56,13 +56,15 @@ syn gamma (RC f as) = do
   spine gamma f as
 syn _ _ = fail "raised eyebrow"
 
-spine :: Sorted gamma => Context gamma -> Radical Syn gamma ->
-         NEL Raw -> Maybe (Radical Syn gamma)
+spine :: Sorted gamma => Context gamma -> Radical gamma Syn ->
+         NEL Raw -> Maybe (Radical gamma Syn)
 spine gamma h@(f ::: Pi _ST :^ r) (s :- as) = _ST :^ r >^< \ _S _T -> do
   s <- chk gamma _S s
   return (app h s)
 spine gamma _ _ = fail "raised eyebrow"
-         
+
+-- :l Elaborator Render
+-- :m Elaborator Render Raw OPE Kernel
 -- render N0 <$> (chk C0 (Star Void :^ OZ) =<< rawString "Pi Type X. Pi X x. X")
 -- let Just idtype = (chk C0 (Star Void :^ OZ) =<< rawString "Pi Type X. Pi X x. X")
 -- render N0 <$> (chk C0 idtype =<< rawString "\\ X. \\ x. x")
