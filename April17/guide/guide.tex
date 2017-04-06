@@ -2,6 +2,11 @@
 \usepackage{a4}
 \usepackage{alltt}
 
+\newcommand*\cleartoleftpage{%
+  \clearpage
+  \ifodd\value{page}\hbox{}\newpage\fi
+}
+
 \begin{document}
 
 \begin{verbatim}
@@ -244,7 +249,8 @@ before the end of the state.
 
 
 
-\newpage\appendix
+\cleartoleftpage
+\appendix
 
 \section{Command Cheatsheet}
 
