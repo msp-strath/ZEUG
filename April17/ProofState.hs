@@ -4,15 +4,38 @@
 -----                                                                    -----
 ------------------------------------------------------------------------------
 
+{-# LANGUAGE KindSignatures, GADTs, DataKinds #-}
+
 module ProofState where
 
-type ProofState = ()
+import Data.List
+
+import Utils
+import Kernel
+
+data Cursor x u = Cur (Bwd x) u [x]
+
+data Defn (delta :: Bwd Sort) (s :: Sort)
+  = Defn {defnSort :: Sorty s
+         ,defnName :: LongName
+         ,defnContext :: Context delta
+         ,defnRadical :: Radical delta s
+         }
+
+data Entity :: * where
+  EHole :: Meta delta s -> Entity
+  EDefn :: Defn delta s -> Entity
+
+type Prefix = LongName
+type Range = (Maybe LongName, Maybe LongName)
+
+type ProofState = Cursor Entity (Prefix,Range)
 
 initialProofState :: ProofState
-initialProofState = ()
+initialProofState = Cur B0 ([],(Nothing,Nothing)) []
 
 display :: ProofState -> [String]
-display () =  -- art by Joan Stark
+display _ =  -- art by Joan Stark
   ["            ___"
   ,"           |   |"
   ,"           |   '._   _"
@@ -27,4 +50,10 @@ display () =  -- art by Joan Stark
   ]
 
 prompt :: ProofState -> String
-prompt () = "/not/in/kansas"
+prompt (Cur _ (p,r) _) = ssh p ++ case r of
+    (Nothing,Nothing) -> ""
+    (Nothing,Just y) -> " (^ " ++ ssh y ++ ")"
+    (Just x,Nothing) -> " (" ++ ssh x ++ " ^)"
+    (Just x,Just y) -> " (" ++ ssh x ++ " ^ " ++ ssh y ++ ")"
+  where  
+    ssh = intercalate "/"

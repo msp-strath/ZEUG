@@ -10,6 +10,7 @@
 
 module OPE where
 
+import Prelude hiding ((^^))
 import Utils
 
 ------------------------------------------------------------------------------
@@ -102,6 +103,9 @@ wk (f :^ r) = f :^ O' r
 (^^) :: f ^ gamma -> gamma <= delta -> f ^ delta
 (f :^ r) ^^ r' = f :^ r' -<=- r
 
+joinH :: ((^) f) ^ gamma -> f ^ gamma
+joinH (fH :^ r) = fH ^^ r
+
 ------------------------------------------------------------------------------
 --  coproduct of slice
 ------------------------------------------------------------------------------
@@ -178,14 +182,6 @@ r0 and r1.
 --  selections
 ------------------------------------------------------------------------------
 
-
-{-
--- Select gamma s delta means that removing s from gamma leaves delta
-data Select :: Bwd s -> s -> Bwd s -> * where
-  Top  :: Select (gamma :< s) s gamma
-  Pop  :: Select gamma s delta -> Select (gamma :< t) s (delta :< t)
--}
-
 data Select :: Bwd s -> Bwd s -> Bwd s -> * where
   None :: Select B0 B0 B0
   Hit :: Select gamma' delta gamma -> Select (gamma' :< s) (delta :< s) gamma
@@ -216,6 +212,22 @@ missAll :: Select gamma' B0 gamma -> gamma' == gamma
 missAll None = Refl
 missAll (Miss s) = case missAll s of Refl -> Refl
 
+data ThickSelect :: Bwd s -> Bwd s -> Bwd s -> * where
+  ThickSelect :: Select gamma theta delta ->
+                 theta <= theta' -> delta <= delta' ->
+                 ThickSelect gamma theta' delta'
+
+thickSelect :: gamma <= gamma' -> Select gamma' theta' delta' ->
+               ThickSelect gamma theta' delta'
+thickSelect OZ None = ThickSelect None OZ OZ
+thickSelect (OS r) (Hit s) = case thickSelect r s of
+  ThickSelect s rtheta rdelta -> ThickSelect (Hit s) (OS rtheta) rdelta
+thickSelect (OS r) (Miss s) = case thickSelect r s of
+  ThickSelect s rtheta rdelta -> ThickSelect (Miss s) rtheta (OS rdelta)
+thickSelect (O' r) (Hit s) = case thickSelect r s of
+  ThickSelect s rtheta rdelta -> ThickSelect s (O' rtheta) rdelta
+thickSelect (O' r) (Miss s) = case thickSelect r s of
+  ThickSelect s rtheta rdelta -> ThickSelect s rtheta (O' rdelta)
 
 ------------------------------------------------------------------------------
 --  relevant data structures

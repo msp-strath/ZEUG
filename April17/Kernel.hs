@@ -39,8 +39,10 @@ data Term :: Sort -> (Bwd Sort -> *) where
   App :: (Term Syn >< Term Chk) gamma -> Term Syn gamma
   Hole :: Meta delta s -> Env delta gamma -> Term s gamma
 
+type LongName = [String]
+
 data Meta delta s = Meta {metaSort :: Sorty s
-                         ,metaName :: [String]
+                         ,metaName :: LongName
                          ,metaContext :: Context delta
                          ,metaInfo :: Info s ^ delta
                          }
@@ -143,7 +145,6 @@ subSyn (App (Pair c f a)) (z :^ r) theta = case hits z c of
           r0 = r -<=- lCoP cgamma
           r1 = r -<=- rCoP cgamma
       in radicalAct (subSyn f (z0 :^ r0) theta0) (sub a (z1 :^ r1) theta1)
-
 subSyn (Hole meta gamma) xr s = Right (mapIx (Hole meta) (sub gamma xr s))
 
 solveSyn :: Sorted gamma =>
@@ -153,14 +154,18 @@ solveSyn (V It) _ _ = Right (V It :^ oI)
 solveSyn (App (Pair c f a)) m s = sortedCoP c $
   radicalAct (thinActivist (solveSyn f m s) (lCoP c))
              (solve a m s ^^ rCoP c)
-solveSyn (Hole m' theta) m@(Meta _ _ _Theta (_T :^ _R)) s@(t :^ r) =
+solveSyn (Hole m' theta) m@(Meta _ _ _Theta _T) s@(t :^ r) =
   case (metaEq m' m , solve theta m s, t) of
     (Just (Refl,Refl), theta :^ r' , IS t) ->
-      sortedObj r $ sortedObj _R $ sortedObj r' $ Left $
-        let fs = zippy _Theta (theta :^ r')
-        in sub t (hitter :^ oN) (discard r fs) :::
-             sub _T (hitter :^ oN) (discard _R fs)
+      sortedObj r $ Left $
+        -- could abstract this pattern if it gets more use
+        subRadical (t :^ r ::: _T) (hitter :^ oN) (zippy _Theta (theta :^ r'))
     (Nothing, theta :^ r, _) -> Right $ Hole m' theta :^ r
+
+subRadical :: Radical gamma s -> Select gamma theta ^ delta ->
+              ALL (Radical delta) theta -> Radical delta s
+subRadical (t ::: _T) z theta = joinH (sub t z theta) ::: joinH (sub _T z theta)
+subRadical (RP p) z theta = RP (joinH (sub p z theta))
 
 zippy :: Context theta -> Env theta ^ gamma -> ALL (Radical gamma) theta
 zippy C0 (E0 Void :^ r) = A0
@@ -198,6 +203,12 @@ instance Sub Unit where
 instance Sub (Got Void) where
   sub' (Got z) = Data.Void.absurd z
   solve (Got z) = Data.Void.absurd z
+
+instance Sub f => Sub ((^) f) where
+  sub' (f :^ r) (z :^ r') theta = sortedObj r' $ case thickSelect r z of
+    ThickSelect z rtheta rgamma ->
+      sub f (z :^ r' -<=- rgamma) (discard rtheta theta) :^ oI
+  solve (f :^ r) m s = sortedObj r $ solve f m s :^ r
 
 -- structural rule for pairing
 instance (Sub f , Sub g) => Sub (f >< g) where
