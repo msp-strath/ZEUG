@@ -213,23 +213,21 @@ rlIO :: READ x Nuff -> IO x
 rlIO r = logIO (Log0 r) r IONUFF
 
 logIO :: ReadLog x -> READ x i -> RLIOSTATE i -> IO x
-logIO log   (RET (Got x)) _          = unlogIO log
+logIO log   (RET (Got x)) _          = curse >> unlogIO log
 logIO log   (DO Peek k)   (IOBUFF c) = logIO log (k RET (See c)) (IOBUFF c)
 logIO log p@(DO Peek k)    IONUFF    = do
   c <- getChar
   case c of
     '\b'   -> unlogIO log
     '\DEL' -> unlogIO log
-    '\n'  -> case nullable p of
+    '\n'   -> case nullable p of
       Just x  -> return x
       Nothing -> logIO (LogPeek log p) (k RET (See '\n')) (IOBUFF '\n')
     c     -> logIO (LogPeek log p) (k RET (See c)) (IOBUFF c)
 logIO log (DO Grok k) (IOBUFF c) = do
   putChar c
   logIO (LogGrok log) (k RET (At ())) IONUFF
-logIO log (DO Barf _) _ = do
-  curse
-  unlogIO log
+logIO log (DO Barf _) _ = curse >> unlogIO log
 
 nullable :: Buffy i ~ False => READ x i -> Maybe x
 nullable (RET (Got x)) = Just x
