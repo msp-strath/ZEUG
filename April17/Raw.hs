@@ -213,7 +213,7 @@ rlIO :: READ x Nuff -> IO x
 rlIO r = logIO (Log0 r) r IONUFF
 
 logIO :: ReadLog x -> READ x i -> RLIOSTATE i -> IO x
-logIO log   (RET (Got x)) _          = return x
+logIO log   (RET (Got x)) _          = unlogIO log
 logIO log   (DO Peek k)   (IOBUFF c) = logIO log (k RET (See c)) (IOBUFF c)
 logIO log p@(DO Peek k)    IONUFF    = do
   c <- getChar
