@@ -17,6 +17,7 @@ import System.IO
 import Utils
 import Raw
 import ProofState
+import Command
 
 version :: String
 version = "1,000,000 years BC"
@@ -63,5 +64,9 @@ mainLoop oldz new b = do
         putStrLn "Nothing to undo"
         mainLoop B0 new False
       oldz :< old -> mainLoop oldz old True
+    c -> case command new c of
+      (ss, m) -> mapM_ putStrLn ss >> case m of
+        Just newer -> mainLoop (oldz :< new) newer True
+        Nothing    -> mainLoop oldz new False
     _         -> mainLoop oldz new True
   -- mores stuff should happen here
