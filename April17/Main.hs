@@ -58,5 +58,10 @@ mainLoop oldz new b = do
   putStrLn ""
   case r of
     RA "quit" -> return ()
+    RA "undo" -> case oldz of
+      B0 -> do
+        putStrLn "Nothing to undo"
+        mainLoop B0 new False
+      oldz :< old -> mainLoop oldz old True
     _         -> mainLoop oldz new True
   -- mores stuff should happen here
