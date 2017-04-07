@@ -5,11 +5,12 @@
 ------------------------------------------------------------------------------
 
 {-# LANGUAGE GADTs, DataKinds, KindSignatures, TypeOperators,
-    TypeFamilies, PatternSynonyms #-}
+    TypeFamilies, PatternSynonyms, RankNTypes #-}
 
 module Raw where
 
 import Data.Char
+import Control.Concurrent
 
 import Utils
 
@@ -191,3 +192,63 @@ readString (DO Barf _) _               = Nothing
 
 rawString :: String -> Maybe Raw
 rawString = readString rawR . NUFF
+
+
+------------------------------------------------------------------------------
+-- The IO Handler
+------------------------------------------------------------------------------
+
+-- this should have NoBuffering and echo False
+
+data ReadLog x
+  = Log0 (READ x Nuff)
+  | LogGrok (ReadLog x)
+  | LogPeek (ReadLog x) (READ x Nuff)
+
+data RLIOSTATE :: RLState -> * where
+  IONUFF :: RLIOSTATE Nuff
+  IOBUFF :: Char -> RLIOSTATE Buff
+
+rlIO :: READ x Nuff -> IO x
+rlIO r = logIO (Log0 r) r IONUFF
+
+logIO :: ReadLog x -> READ x i -> RLIOSTATE i -> IO x
+logIO log   (RET (Got x)) _          = return x
+logIO log   (DO Peek k)   (IOBUFF c) = logIO log (k RET (See c)) (IOBUFF c)
+logIO log p@(DO Peek k)    IONUFF    = do
+  c <- getChar
+  case c of
+    '\b'   -> unlogIO log
+    '\DEL' -> unlogIO log
+    '\n'  -> case nullable p of
+      Just x  -> return x
+      Nothing -> logIO (LogPeek log p) (k RET (See '\n')) (IOBUFF '\n')
+    c     -> logIO (LogPeek log p) (k RET (See c)) (IOBUFF c)
+logIO log (DO Grok k) (IOBUFF c) = do
+  putChar c
+  logIO (LogGrok log) (k RET (At ())) IONUFF
+logIO log (DO Barf _) _ = do
+  curse
+  unlogIO log
+
+nullable :: Buffy i ~ False => READ x i -> Maybe x
+nullable (RET (Got x)) = Just x
+nullable (DO Barf _)   = Nothing
+nullable (DO Peek k)   = nullable (k RET EOT)
+
+curse :: IO ()
+curse = mapM_ paf "!$!#!&!*!%!?!!!!!!!!!!!$!#!&!*!%!?! " where
+  paf c = do
+    putChar c
+    threadDelay 2000
+    putChar '\b'
+
+unlogIO :: ReadLog x -> IO x
+unlogIO (Log0 r) = rlIO r
+unlogIO (LogGrok log) = do
+  putStr "\b \b"
+  unlogIO log
+unlogIO (LogPeek log p) = logIO log p IONUFF
+
+rawIO :: IO Raw
+rawIO = rlIO rawR
