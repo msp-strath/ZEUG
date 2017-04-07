@@ -30,6 +30,24 @@ renderSyn ns (V It :^ r) Nothing = RA (itsName ns r)
 renderSyn ns (V It :^ r) (Just rs) = RC (RA (itsName ns r)) rs
 renderSyn ns (App fa :^ r) rs = fa :^ r >^< \f a ->
   renderSyn ns f (Just (render ns a :- rs))
+renderSyn ns (Hole m theta :^ r) rs =
+  renderHole ns (show $ metaName m) (metaContext m) (theta :^ r) rs
+
+renderHole :: Namings gamma ->
+              String -> Context theta -> Env theta ^ gamma ->
+              Maybe (NEL Raw) -> Raw
+renderHole ns h C0 _ Nothing = RA h
+renderHole ns h C0 _ (Just rs) = RC (RA h) rs
+renderHole ns h (_Theta :\ _) (ES p :^ r) rs = p :^ r >^< \theta i ->
+  renderHole ns h _Theta theta (Just (renderInstance ns i :- rs))
+
+renderInstance :: Namings gamma -> Instance s ^ gamma -> Raw
+renderInstance ns (IS s :^ r) = render ns (s :^ r)
+renderInstance ns (IP p :^ r) = renderPnt ns (p :^ r)
+
+renderPnt :: Namings gamma -> Term Pnt ^ gamma -> Raw
+renderPnt ns (Hole m theta :^ r) =
+  renderHole ns (show $ metaName m) (metaContext m) (theta :^ r) Nothing
 
 -- render N0 (Star Void)
 -- render N0 (Pi (Pair CZZ (Star Void) (K (Star Void))))

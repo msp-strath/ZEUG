@@ -8,8 +8,6 @@
 
 module ProofState where
 
-import Data.List
-
 import Utils
 import Kernel
 
@@ -32,7 +30,7 @@ type Range = (Maybe LongName, Maybe LongName)
 type ProofState = Cursor Entity (Prefix,Range)
 
 initialProofState :: ProofState
-initialProofState = Cur B0 ([],(Nothing,Nothing)) []
+initialProofState = Cur B0 (mempty,(Nothing,Nothing)) []
 
 display :: ProofState -> [String]
 display _ =  -- art by Joan Stark
@@ -50,10 +48,9 @@ display _ =  -- art by Joan Stark
   ]
 
 prompt :: ProofState -> String
-prompt (Cur _ (p,r) _) = ssh p ++ case r of
-    (Nothing,Nothing) -> ""
-    (Nothing,Just y) -> " (^ " ++ ssh y ++ ")"
-    (Just x,Nothing) -> " (" ++ ssh x ++ " ^)"
-    (Just x,Just y) -> " (" ++ ssh x ++ " ^ " ++ ssh y ++ ")"
-  where  
-    ssh = intercalate "/"
+prompt (Cur _ (p,r) _) = show p ++ case r of
+  (Nothing,Nothing) -> ""
+  (Nothing,Just y) -> " (^ " ++ show y ++ ")"
+  (Just x,Nothing) -> " (" ++ show x ++ " ^)"
+  (Just x,Just y) -> " (" ++ show x ++ " ^ " ++ show y ++ ")"
+

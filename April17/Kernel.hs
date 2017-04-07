@@ -2,15 +2,18 @@
 {-# LANGUAGE GADTs, DataKinds, TypeOperators, KindSignatures,
              ConstraintKinds, RankNTypes, FlexibleInstances,
              TypeFamilies, StandaloneDeriving, DeriveFoldable,
-             DeriveFunctor, DeriveTraversable, FlexibleContexts #-}
+             DeriveFunctor, DeriveTraversable, FlexibleContexts,
+             GeneralizedNewtypeDeriving #-}
 module Kernel where
 
+import Data.List
 import Prelude hiding ((^^))
-import Utils
-import OPE
 import Data.Void
 import Data.Type.Equality((:~:)(Refl))
 import Control.Monad
+
+import Utils
+import OPE
 
 
 ------------------------------------------------------------------------------
@@ -40,7 +43,10 @@ data Term :: Sort -> (Bwd Sort -> *) where
   App :: (Term Syn >< Term Chk) gamma -> Term Syn gamma
   Hole :: Meta delta s -> Env delta gamma -> Term s gamma
 
-type LongName = [String]
+newtype LongName = LongName [String] deriving (Eq,Monoid)
+
+instance Show LongName where
+  show (LongName xs) = intercalate "/" xs
 
 data Meta delta s = Meta {metaSort :: Sorty s
                          ,metaName :: LongName
@@ -304,14 +310,25 @@ sortEq Pnty Pnty = Just Refl
 sortEq _    _    = Nothing
 
 instance SyntaxEq (Term s) where
-  eq (Star t) (Star t') = eq t t' 
-  eq (Pi   t) (Pi   t') = eq t t'
-  eq (Lam  t) (Lam  t') = eq t t'
-  eq (E    t) (E    t') = eq t t'
-  eq (V    t) (V    t') = eq t t'
-  eq (App  t) (App  t') = eq t t'
-  eq _        _         = fail "gotcha"
+  eq (Star       t) (Star        t') = eq t t' 
+  eq (Pi         t) (Pi          t') = eq t t'
+  eq (Lam        t) (Lam         t') = eq t t'
+  eq (E          t) (E           t') = eq t t'
+  eq (V          t) (V           t') = eq t t'
+  eq (App        t) (App         t') = eq t t'
+  eq (Hole m theta) (Hole m' theta') = do
+    (Refl,Refl) <- metaEq m m'
+    eq theta theta'
+  eq _              _                = fail "gotcha"
 
+instance SyntaxEq (Env gamma) where
+  eq (E0 v) (E0 v') = eq v v'
+  eq (ES p) (ES p') = eq p p'
+
+instance SyntaxEq (Instance s) where
+  eq (IS t) (IS t') = eq t t'
+  eq (IP p) (IP p') = eq p p'
+  
 conSortEq :: Context delta -> Context delta' -> Maybe (delta :~: delta')
 conSortEq C0 C0 = return Refl
 conSortEq (delta :\ (s,_,_)) (delta' :\ (s',_,_)) = do
