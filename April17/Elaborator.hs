@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs, DataKinds, TypeOperators, KindSignatures, TypeFamilies #-}
 module Elaborator where
 
+import Data.Type.Equality((:~:)(Refl))
 import Utils
 import Raw
 import OPE

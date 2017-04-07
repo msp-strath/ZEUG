@@ -11,7 +11,9 @@
 module OPE where
 
 import Prelude hiding ((^^))
+import Data.Type.Equality((:~:)(Refl))
 import Utils
+
 
 ------------------------------------------------------------------------------
 --  order-preserving embeddings
@@ -208,7 +210,7 @@ hits (Hit s) (CS' c) = case hits s c of
 hits (Hit s) (C'S c) = case hits s c of
   Hits s0 s1 ctheta cgamma -> Hits s0 (Hit s1) (C'S ctheta) cgamma
 
-missAll :: Select gamma' B0 gamma -> gamma' == gamma
+missAll :: Select gamma' B0 gamma -> gamma' :~: gamma
 missAll None = Refl
 missAll (Miss s) = case missAll s of Refl -> Refl
 
@@ -274,7 +276,7 @@ dive (L _ f :^ r) = f :^ OS r
 -- Equality testing
 ------------------------------------------------------------------------------
 
-opeEq :: gamma <= theta -> delta <= theta -> Maybe (gamma == delta)
+opeEq :: gamma <= theta -> delta <= theta -> Maybe (gamma :~: delta)
 opeEq OZ     OZ      = Just Refl
 opeEq (OS r) (OS r') = do
   Refl <- opeEq r r'

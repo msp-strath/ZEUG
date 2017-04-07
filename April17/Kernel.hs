@@ -9,6 +9,7 @@ import Prelude hiding ((^^))
 import Utils
 import OPE
 import Data.Void
+import Data.Type.Equality((:~:)(Refl))
 import Control.Monad
 
 
@@ -296,7 +297,7 @@ data Sorty :: Sort -> * where
 -- Equality testing
 ------------------------------------------------------------------------------
 
-sortEq :: Sorty s -> Sorty s' -> Maybe (s == s')
+sortEq :: Sorty s -> Sorty s' -> Maybe (s :~: s')
 sortEq Chky Chky = Just Refl
 sortEq Syny Syny = Just Refl
 sortEq Pnty Pnty = Just Refl
@@ -311,7 +312,7 @@ instance SyntaxEq (Term s) where
   eq (App  t) (App  t') = eq t t'
   eq _        _         = fail "gotcha"
 
-conSortEq :: Context delta -> Context delta' -> Maybe (delta == delta')
+conSortEq :: Context delta -> Context delta' -> Maybe (delta :~: delta')
 conSortEq C0 C0 = return Refl
 conSortEq (delta :\ (s,_,_)) (delta' :\ (s',_,_)) = do
   Refl <- sortEq s s'
@@ -319,7 +320,7 @@ conSortEq (delta :\ (s,_,_)) (delta' :\ (s',_,_)) = do
   return Refl
 conSortEq _ _ = error "we did a bad"
 
-metaEq :: Meta delta s -> Meta delta' s' -> Maybe (delta == delta', s == s')
+metaEq :: Meta delta s -> Meta delta' s' -> Maybe (delta :~: delta', s :~: s')
 metaEq (Meta s n delta _) (Meta s' n' delta' _) = do
   guard (n == n')
   -- invariant: if the guard succeeds the rest should succeed, cos
