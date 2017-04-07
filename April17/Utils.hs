@@ -2,7 +2,7 @@
              DeriveFunctor, StandaloneDeriving, PolyKinds,
              TypeOperators, ScopedTypeVariables, RankNTypes,
              TypeFamilies, UndecidableInstances, PatternSynonyms,
-             ConstraintKinds #-}
+             ConstraintKinds, DeriveFoldable, DeriveTraversable #-}
 module Utils where
 
 type family EQ x y where
@@ -65,7 +65,7 @@ velemIndex' x n (VCons x' xs) =
     fmap FSuc (velemIndex' x n xs)
 
 -- bwd utilities
-data Bwd x = B0 | Bwd x :< x deriving Functor
+data Bwd x = B0 | Bwd x :< x deriving (Functor, Foldable, Traversable)
 
 bmap :: (a -> b) -> Bwd a -> Bwd b
 bmap f B0 = B0
@@ -104,6 +104,7 @@ nel (x :- xs) = x : case xs of
 instance Show x => Show (NEL x) where show = show . nel
 pattern Only x   = x :- Nothing
 pattern x :-: xs = x :- Just xs
+infixr 3 :-:
 
 -- indexed unit type
 data Happy :: k -> * where
@@ -203,7 +204,7 @@ mat f (At a) = At (f a)
 (@>=) :: MonadIx m => m (a @= j) i -> (a -> m t j) -> m t i
 m @>= k = m ?>= \ x -> case x of At a -> k a
 
-(@>) :: MonadIx m => m (() @= j) i -> m t j -> m t i
+(@>) :: MonadIx m => m (a @= j) i -> m t j -> m t i
 m @> n = m @>= const n
 infixr 3 @>
 

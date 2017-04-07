@@ -43,7 +43,7 @@ data Term :: Sort -> (Bwd Sort -> *) where
   App :: (Term Syn >< Term Chk) gamma -> Term Syn gamma
   Hole :: Meta delta s -> Env delta gamma -> Term s gamma
 
-newtype LongName = LongName [String] deriving (Eq,Monoid)
+newtype LongName = LongName {longName :: [String]} deriving (Eq,Monoid)
 
 instance Show LongName where
   show (LongName xs) = intercalate "/" xs

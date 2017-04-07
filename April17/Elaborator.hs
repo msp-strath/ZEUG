@@ -23,6 +23,7 @@ data Elaborator :: (Bwd Sort -> *) -> (Bwd Sort -> *) where
            Elaboratkey () gamma
   Query :: String -> Term Chk ^ gamma ->
            Elaboratkey (Term Chk ^ gamma) gamma
+  Define :: Radical gamma Syn -> Elaboratkey (Unit ^ gamma) gamma
 
 type Elaboratkey a gamma = Elaborator (a @= gamma) gamma
 type ELAB a gamma = Prog Elaborator (a @= gamma) gamma
@@ -53,24 +54,11 @@ chk _T t =
   cmd (DefEq star _S _T) @>
   raturn s
 
-{-
-fetch :: Context ^ gamma -> Sorty s -> String ->
-         ELAB (This s ^ gamma, Info s ^ gamma) gamma
-fetch (C0 :^ _) s x = cmd $ Reject $ "oh fetch " ++ x
-fetch ((gamma :\ (s',y,i :^ r)) :^ r') s x =
-  if x == y then
-    case sortEq s s' of
-      Just Refl -> raturn $ (It :^ r' -<=- OS oN, i :^ r' -<=- O' r)
-      Nothing -> cmd $ Reject $ "sort error on " ++ x
-  else
-    fetch (gamma :^ r' -<=- O' oI) s x
--}
-
 syn :: Sorted gamma => Raw -> ELAB (Radical gamma Syn) gamma
 syn (RA x) =
   cmd (Fetch Syny x) @>= \(x , _S) -> 
   raturn (mapIx (E . V) x ::: _S)
-syn (RC (RA "the") (_T :-: Only t)) =
+syn (RC t (RA ":" :-: Only _T)) =
   chk star _T @>= \_T -> 
   chk _T t @>= \t -> 
   raturn (t ::: _T)
@@ -86,12 +74,23 @@ spine h@(f ::: Pi _ST :^ r) (s :- as) = _ST :^ r >^< \ _S _T ->
   raturn (app h s)
 spine _ _ = cmd $ Reject "raised eyebrow"
 
+define :: Sorted gamma => Raw -> ELAB (Unit ^ gamma) gamma
+define (RC (RA "=") (Only t)) =
+  syn t @>= \ t ->
+  cmd (Define t)
+define (RC _S (Only (RB x t))) =
+  chk star _S @>= \ _S ->
+  cmd (Under (Syny, x, _S) (define t)) @>
+  raturn (Void :^ oN)
+define _ = cmd $ Reject "I didn't think much of that definition"
+
+
 ------------------------------------------------------------------------------
 -- Implementation of Elaborator Interface
 ------------------------------------------------------------------------------
 
 type Elab gamma =
-  RWST (ProofState, Context gamma, LongName) (Bwd Entity) Int Maybe
+  RWST (ProofState, Context gamma, LongName) [Entity] Int Maybe
 
 elab :: Sorted gamma => ELAB a gamma -> Elab gamma a
 elab (RET (At a)) = return a
@@ -127,8 +126,25 @@ elab (DO (Query x _T) k) = do
   i <- get
   put (i + 1)
   let m = Meta Syny (mappend y (LongName [show i])) gamma _T
-  tell (B0 :< EHole m)
+  tell [EHole m]
   elab (k RET (At (E (Hole m (idEnv gamma)) :^ oI)))
+elab (DO (Define tT) k) = do
+  (ps, gamma, y) <- ask
+  tell [EDefn (Defn Syny y gamma tT)]
+  elab (k RET (At (Void :^ oN)))
+
+tryElab :: Sorted gamma => (ProofState, Context gamma, LongName) ->
+           ELAB a gamma -> Maybe (a, ProofState)
+tryElab stuff@(Cur bef u aft, _, _) p = do
+  (a, _, w) <- runRWST (elab p) stuff 0
+  let (ez, es) = fishFace B0 w
+  return (a, Cur (bef +<+ ez) u (es ++ aft))
+
+fishFace :: Bwd Entity -> [Entity] -> (Bwd Entity, [Entity])
+fishFace ez []               = (ez, [])
+fishFace ez es@(EHole _ : _) = (ez, es)
+fishFace ez (e : es)         = fishFace (ez :< e) es
+
 
 -- :l Elaborator Render
 -- :m Elaborator Render Raw OPE Kernel
