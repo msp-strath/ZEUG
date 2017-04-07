@@ -35,6 +35,8 @@ banner = mapM_ putStrLn
   ,""
   ,"     version " ++ version
   ,""
+  ,"quit quits"
+  ,""
   ]
   
 main :: IO ()

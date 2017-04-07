@@ -136,7 +136,7 @@ where
 \end{array}\]
 E.g., one might define a useless identity operation, named {\tt foo} as follows.
 \begin{verbatim}
-  foo, Type X. X x. = x : X
+  foo, Type X. X x. =, x : X
 \end{verbatim}
 
 One can, of course, imagine a nicer syntax. (A body is always a
@@ -191,7 +191,7 @@ suffix. We might hope to arrive at the following
 
 Some time earlier, you might have typed at the prompt {\tt >}
 \begin{verbatim}
-> id, = ? : Pi Type X. Pi X x. X
+> id, =, ? : Pi Type X. Pi X x. X
 \end{verbatim}
 which would result in the display.
 \begin{verbatim}
@@ -260,6 +260,8 @@ before the end of the state.
 \section{Command Cheatsheet}
 
 \[\begin{array}{ll}
+\mathit{name}\;\mathit{construction} &
+ \mbox{make a definition} \\
 {\tt =}\;\mathit{term} & \mbox{give a refinement} \smallskip\\
 
 {\tt /}\;\mathit{name} & \mbox{zoom prefix in to name}\\
@@ -270,6 +272,28 @@ before the end of the state.
 \bigskip\\
 {\tt quit} & \mbox{get me out of here} \\
 {\tt undo} & \mbox{undo last change}
+\end{array}\]
+
+\section{Grammars}
+
+\[\begin{array}{rrll}
+\mathit{construction} & ::= & {\tt =}\:\mathit{syn} &
+    \mbox{construction body} \\
+& | & \mathit{chk}\;x.\,\mathit{construction} &
+    \mbox{variable parameter construction} \medskip \\
+\mathit{chk} & ::= & \mathit{syn} &
+  \mbox{term with synthesizable type} \\
+& | & {\tt Type} & \mbox{type of all types} \\
+& | & {\tt Pi}\;\mathit{chk}\;\mathit{scope} & \mbox{function type} \\
+& | & {\tt \backslash}\;\mathit{scope} & \mbox{abstraction} \\
+& | & {\tt ?}\mathit{name} & \mbox{hole generation}
+\medskip \\
+\mathit{scope} & ::= & x.\,\mathit{chk} & \mbox{named binding} \\
+& | & \mathit{chk} & \mbox{vacuous binding}
+\medskip \\
+\mathit{syn} & ::= & x & \mbox{variable usage} \\
+  & | & \mathit{chk}\;{\tt :}\;\mathit{chk} & \mbox{type ascription} \\
+  & | & \mathit{syn}\;\mathit{chk}+ & \mbox{application}
 \end{array}\]
 
 \end{document}
