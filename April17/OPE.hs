@@ -37,18 +37,24 @@ class Sorted (gamma :: Bwd s) where
   oN :: B0    <= gamma    -- initiality
   misser :: Select gamma B0 gamma
   hitter :: Select gamma gamma B0
+  copL :: CoP gamma B0 gamma
+  copR :: CoP B0 gamma gamma
 
 instance Sorted B0 where
   oI = OZ
   oN = OZ
   misser = None
   hitter = None
+  copL = CZZ
+  copR = CZZ
 
 instance Sorted gamma => Sorted (gamma :< s) where
   oI = OS oI
   oN = O' oN
   misser = Miss misser
   hitter = Hit hitter
+  copL = CS' copL
+  copR = C'S copR
 
 sortedObj :: gamma <= delta -> Holds (Sorted gamma, Sorted delta)
 sortedObj OZ t = t

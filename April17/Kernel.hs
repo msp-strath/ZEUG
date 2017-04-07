@@ -83,6 +83,12 @@ type family Info (s :: Sort) :: Bwd Sort -> * where
 lookupC :: Context gamma -> (B0 :< s) <= gamma -> Info s ^ gamma
 lookupC (_ :\ (_,_,i)) (OS _) = wk i
 lookupC (gamma :\ _) (O' r) = wk (lookupC gamma r)
+
+idEnv :: Context gamma -> Env gamma gamma
+idEnv C0 = E0 Void
+idEnv (_Gamma :\ (Syny,_,_)) =
+  ES (Pair (C'S copL) (idEnv _Gamma) (IS (E (V It))))
+idEnv (_Gamma :\ (Pnty,_,_)) = undefined -- FIXME
   
 
 ------------------------------------------------------------------------------

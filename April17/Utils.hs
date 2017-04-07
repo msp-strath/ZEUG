@@ -83,6 +83,10 @@ xs <>< []       = xs
 B0        <>> ys = ys
 (xs :< x) <>> ys = xs <>> (x : ys)
 
+instance Monoid (Bwd x) where
+  mempty = B0
+  mappend = (+<+)
+
 data ALL :: (s -> *) -> Bwd s -> * where
   A0 :: ALL p B0
   AS :: ALL p gamma -> p s -> ALL p (gamma :< s)
