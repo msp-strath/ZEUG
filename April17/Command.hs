@@ -2,6 +2,8 @@
 
 module Command where
 
+import Data.List
+
 import Utils
 import Raw
 import Kernel
@@ -49,6 +51,16 @@ command (Cur (ez :< e) u@(p, (n, _)) es) (RA _ "prev")
   | Just _ <- inView (p, n) e = ([], Just (Cur ez u (e : es)))
   | otherwise                 = (["Bump!"], Nothing)
 
+-- SETTING A RANGE
+command ps (RC (RA _ x) (RA _ "^" :-: Only (RA _ y)))
+  = rerange ps (Just (fst (parseName ps x)), Just (fst (parseName ps y)))
+command ps (RC (RA _ x) (Only (RA _ "^")))
+  = rerange ps (Just (fst (parseName ps x)), Nothing)
+command ps (RC (RA _ "^") (Only (RA _ y)))
+  = rerange ps (Nothing, Just (fst (parseName ps y)))
+command (Cur ez (p, _) es) (RA _ "^")
+  = ([], Just (Cur ez (p, (Nothing, Nothing)) es))
+
 -- BARF!
 command ps c = (["Try doing something else."], Nothing)
 
@@ -57,3 +69,9 @@ isDefBody (RC (RA _ "=") (Only s))    = True
 isDefBody (RC _S (Only (RB _ x _T)))  = isDefBody _T
 isDefBody (RC _S (Only _T))           = isDefBody _T
 isDefBody _                           = False
+
+rerange :: ProofState -> (Maybe LongName, Maybe LongName) ->
+  ([String], Maybe ProofState)
+rerange ps@(Cur ez (p@(LongName x), _) es) (a, b) =
+  ([], Just (Cur ez (p, (a >>= tidy, b >>= tidy)) es)) where
+  tidy (LongName y) = LongName <$> stripPrefix x y
