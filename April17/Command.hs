@@ -28,5 +28,5 @@ command ps c = (["Try doing something else."], Nothing)
 isDefBody :: Raw c -> Bool
 isDefBody (RC (RA _ "=") (Only s))    = True
 isDefBody (RC _S (Only (RB _ x _T)))  = isDefBody _T
-isDefBody (RC _S (Only _T))         = isDefBody _T
-isDefBody _                         = False
+isDefBody (RC _S (Only _T))           = isDefBody _T
+isDefBody _                           = False

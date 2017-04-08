@@ -57,25 +57,31 @@ data Atom
   | TyCon
   | DaCon
   | Vrble
+  | Coord
   | Holey
   | Defin
 
 instance Show Atom where
-  show Punct = " " -- plain
-  show TyCon = "4" -- blue
-  show DaCon = "1" -- red
-  show Vrble = "5" -- magenta
-  show Holey = "3" -- yellow
-  show Defin = "2" -- green
+  show Punct = "\ESC[0m"  -- plain
+  show TyCon = "\ESC[34m" -- blue
+  show DaCon = "\ESC[31m" -- red
+  show Vrble = "\ESC[35m" -- magenta
+  show Coord = "\ESC[36m" -- cyan
+  show Holey = "\ESC[33m" -- yellow
+  show Defin = "\ESC[32m" -- green
 
 instance Colour Atom where
-  colour c x = "\ESC[3" ++ show c ++ "m" ++ x ++ "\ESC[30m"
+  colour c x = show c ++ x ++ show Punct
+
+-- String length function that discounts colour-change codes
+mylen :: String -> Int
+mylen ('\ESC' : '[' : s) = go s where
+  go ('m' : s) = mylen s
+  go (_ : s)   = go s
+  go []        = 0
+mylen (_ : s) = 1 + mylen s
+mylen "" = 0
 
 -- render N0 (Star Void)
 -- render N0 (Pi (Pair CZZ (Star Void) (K (Star Void))))
 -- render N0 (Pi (Pair CZZ (Star Void) (L "X" (Pi (Pair (CSS CZZ) (E (V It)) (K (E (V It))))))))
-
-mylen :: String -> Int
-mylen ('\ESC' : '[' : '3' : _ : 'm' : s) = mylen s
-mylen (_ : s) = 1 + mylen s
-mylen "" = 0

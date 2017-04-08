@@ -95,8 +95,8 @@ displayContext C0 = ([], N0)
 displayContext (gamma :\ (s, x, i)) = (bs ++ [b], NS nz x) where
   (bs, nz) = displayContext gamma
   b = "  " ++ case s of
-    Syny -> x ++ " : " ++ show (render nz i)
-    Pnty -> x
+    Syny -> show (RA Vrble x) ++ " : " ++ show (render nz i)
+    Pnty -> show (RA Vrble x)
 
 displayEntity :: Char -> Entity -> [String]
 displayEntity c (EHole m) = ("" : bs ++ [rule, h]) where
