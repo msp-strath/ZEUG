@@ -12,6 +12,7 @@ module ProofState where
 import Data.Maybe
 import Data.List
 import Data.List.Split
+import Control.Monad
 
 import Utils
 import OPE
@@ -22,7 +23,8 @@ import Render
 data Cursor u x = Cur (Bwd x) u [x] deriving (Functor, Foldable, Traversable)
 
 data Defn (delta :: Bwd Sort) (s :: Sort)
-  = Defn {defnSort :: Sorty s
+  = Sorted delta =>
+    Defn {defnSort :: Sorty s
          ,defnName :: LongName
          ,defnContext :: Context delta
          ,defnRadical :: Radical delta s
@@ -66,14 +68,20 @@ prompt (Cur _ (p,r) _) = show p ++ case r of
   (Just x,Nothing) -> " (" ++ show x ++ " ^)"
   (Just x,Just y) -> " (" ++ show x ++ " ^ " ++ show y ++ ")"
 
-newName :: ProofState -> String -> Maybe LongName
-newName ps@(Cur _ (p, _) _) x = case x of
-    '/' : x  -> good (segs x)
-    x        -> good (mappend p (segs x))
+parseName :: ProofState -> String -> (LongName, Bool {-holey ?-})
+parseName (Cur _ (p, _) _) x = case x of
+    '/' : _ -> (s, h)
+    _       -> (mappend p s, h)
   where
-    segs x = LongName (filter (not . null) (splitWhen (== '/') x))
-    good x = if any (isPrefixOf (longName x) . longName . nameOf) ps
-      then Nothing else Just x
+    (qs, y) = partition (== '?') x
+    s = LongName (filter (not . null) (splitWhen (== '/') y))
+    h = not (null qs)
+
+newName :: ProofState -> String -> Maybe LongName
+newName ps x = do
+  let (y, _) = parseName ps x
+  guard . not $ any (isPrefixOf (longName y) . longName . nameOf) ps
+  return y
 
 inView :: (LongName, Maybe LongName) -> Entity -> Bool
 inView (p, n) e = isPrefixOf (longName p) x && not (isPrefixOf b x) where

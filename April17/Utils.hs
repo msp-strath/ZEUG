@@ -105,6 +105,9 @@ instance Show x => Show (NEL x) where show = show . nel
 pattern Only x   = x :- Nothing
 pattern x :-: xs = x :- Just xs
 infixr 3 :-:
+nconc :: NEL x -> Maybe (NEL x) -> NEL x
+nconc (Only x)   ys = x :- ys
+nconc (x :-: xs) ys = x :-: nconc xs ys
 
 -- indexed unit type
 data Happy :: k -> * where
