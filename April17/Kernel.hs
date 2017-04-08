@@ -11,6 +11,8 @@ import Prelude hiding ((^^))
 import Data.Void
 import Data.Type.Equality((:~:)(Refl))
 import Control.Monad
+import Control.Newtype
+import Data.Monoid
 
 import Utils
 import OPE
@@ -48,7 +50,8 @@ newtype LongName = LongName {longName :: [String]} deriving (Eq,Monoid)
 instance Show LongName where
   show (LongName xs) = intercalate "/" xs
 
-data Meta delta s = Meta {metaSort :: Sorty s
+data Meta delta s = Sorted delta =>
+                    Meta {metaSort :: Sorty s
                          ,metaName :: LongName
                          ,metaContext :: Context delta
                          ,metaInfo :: Info s ^ delta
@@ -110,14 +113,27 @@ class Sub (f :: Bwd Sort -> *) where
   sub' :: f gamma' ->
           Select gamma' theta ^ delta -> ALL (Radical delta) theta ->
           f ^ delta
-  solve :: Sorted gamma =>
-           f gamma -> Meta delta s -> Instance s ^ delta -> f ^ gamma
+  update :: Sorted gamma => f gamma -> [Update] ->f ^ gamma
 
 sub :: Sub f =>
        f gamma' -> Select gamma' theta ^ delta -> ALL (Radical delta) theta ->
        f ^ delta
 sub f (s :^ r) A0 = case missAll s of Refl -> f :^ r
 sub f s gamma = sub' f s gamma
+
+data Updata :: Bwd Sort -> Sort -> * where
+  Solve :: Instance s ^ delta  -> Updata delta s
+  Renew :: Meta delta s        -> Updata delta s
+
+data Update :: * where
+  (:=>) :: Meta delta s -> Updata delta s -> Update
+
+updateMe :: Meta delta s -> Update -> Maybe (Updata delta s)
+updateMe (Meta s x _Theta _) (Meta s' x' _Theta' _ :=> u) = do
+  guard (x == x')
+  Refl <- sortEq s s'
+  Refl <- conSortEq _Theta _Theta'
+  return u
 
 data Radical :: Bwd Sort -> Sort -> * where
   (:::) :: Term Chk ^ delta -> Term Chk ^ delta -> Radical delta Syn
@@ -139,9 +155,10 @@ instance Sub (Term Chk) where
   sub' (Lam t)  xr s = mapIx Lam $ sub' t xr s
   sub' (E e)    xr s = stop $ subSyn e xr s
 
-  solve (Pi _ST) m s = mapIx Pi $ solve _ST m s
-  solve (Lam t)  m s = mapIx Lam $ solve t m s
-  solve (E e)    m s = stop $ solveSyn e m s
+  update (Star v) us = mapIx Star $ update v us
+  update (Pi _ST) us = mapIx Pi   $ update _ST us
+  update (Lam t)  us = mapIx Lam  $ update t us
+  update (E e)    us = stop $ updateSyn e us
 
 -- substitution in a Term Syn can radicalise it
 type Activist s delta = Either (Radical delta s) (Term s ^ delta)
@@ -160,25 +177,28 @@ subSyn (App (Pair c f a)) (z :^ r) theta = case hits z c of
       in radicalAct (subSyn f (z0 :^ r0) theta0) (sub a (z1 :^ r1) theta1)
 subSyn (Hole meta gamma) xr s = Right (mapIx (Hole meta) (sub gamma xr s))
 
-solveSyn :: Sorted gamma =>
-            Term Syn gamma -> Meta theta s -> Instance s ^ theta ->
-            Activist Syn gamma 
-solveSyn (V It) _ _ = Right (V It :^ oI)
-solveSyn (App (Pair c f a)) m s = sortedCoP c $
-  radicalAct (thinActivist (solveSyn f m s) (lCoP c))
-             (solve a m s ^^ rCoP c)
-solveSyn (Hole m' theta) m@(Meta _ _ _Theta _T) s@(t :^ r) =
-  case (metaEq m' m , solve theta m s, t) of
-    (Just (Refl,Refl), theta :^ r' , IS t) ->
-      sortedObj r $ Left $
-        -- could abstract this pattern if it gets more use
-        subRadical (t :^ r ::: _T) (hitter :^ oN) (zippy _Theta (theta :^ r'))
-    (Nothing, theta :^ r, _) -> Right $ Hole m' theta :^ r
+updateSyn :: Sorted gamma => Term Syn gamma -> [Update] ->
+             Activist Syn gamma 
+updateSyn (V It) _ = Right (V It :^ oI)
+updateSyn (App (Pair c f a)) us = sortedCoP c $
+  radicalAct (thinActivist (updateSyn f us) (lCoP c))
+             (update a us ^^ rCoP c)
+updateSyn (Hole m@(Meta _ _ _Theta _T) theta) us =
+  case (ala' First foldMap (updateMe m) us, update theta us) of
+    (Nothing                   , theta :^ r) -> Right $ Hole m theta :^ r
+    (Just (Renew m)            , theta :^ r) -> Right $ Hole m theta :^ r
+    (Just (Solve (IS t :^ r')) , theta :^ r) -> sortedObj r' $ Left $
+      -- could abstract this pattern if it gets more use
+      subRadical (t :^ r' ::: _T) (hitter :^ oN) (zippy _Theta (theta :^ r))
 
 subRadical :: Radical gamma s -> Select gamma theta ^ delta ->
               ALL (Radical delta) theta -> Radical delta s
 subRadical (t ::: _T) z theta = joinH (sub t z theta) ::: joinH (sub _T z theta)
-subRadical (RP p) z theta = RP (joinH (sub p z theta))
+subRadical (RP p)     z theta = RP (joinH (sub p z theta))
+
+updateRadical :: Sorted gamma => Radical gamma s -> [Update] -> Radical gamma s
+updateRadical (t ::: _T) us = joinH (update t us) ::: joinH (update _T us)
+updateRadical (RP p)     us = RP (joinH (update p us))
 
 zippy :: Context theta -> Env theta ^ gamma -> ALL (Radical gamma) theta
 zippy C0 (E0 Void :^ r) = A0
@@ -211,17 +231,17 @@ stop (Right e) = mapIx E e
 
 instance Sub Unit where
   sub' Void (None :^ r) A0 = Void :^ r
-  solve Void _ _ = Void :^ oN
+  update Void _ = Void :^ oN
   
 instance Sub (Got Void) where
   sub' (Got z) = Data.Void.absurd z
-  solve (Got z) = Data.Void.absurd z
+  update (Got z) = Data.Void.absurd z
 
 instance Sub f => Sub ((^) f) where
   sub' (f :^ r) (z :^ r') theta = sortedObj r' $ case thickSelect r z of
     ThickSelect z rtheta rgamma ->
       sub f (z :^ r' -<=- rgamma) (discard rtheta theta) :^ oI
-  solve (f :^ r) m s = sortedObj r $ solve f m s :^ r
+  update (f :^ r) us = sortedObj r $ update f us :^ r
 
 -- structural rule for pairing
 instance (Sub f , Sub g) => Sub (f >< g) where
@@ -233,8 +253,8 @@ instance (Sub f , Sub g) => Sub (f >< g) where
           r1 = r -<=- rCoP cgamma
       in pair (sub f (z0 :^ r0) theta0) (sub g (z1 :^ r1) theta1)
 
-  solve (Pair c f g) m s = sortedCoP c $
-    pair (solve f m s ^^ lCoP c) (solve g m s ^^ rCoP c)
+  update (Pair c f g) us = sortedCoP c $
+    pair (update f us ^^ lCoP c) (update g us ^^ rCoP c)
 
 -- structural rule for binding
 instance Sub f => Sub (s !- f) where
@@ -242,8 +262,8 @@ instance Sub f => Sub (s !- f) where
   sub' (L y f) (x :^ r) theta =
     abstract y (sub' f (Miss x :^ OS r) (mapIx radWk theta))
 
-  solve (K f) m s = mapIx K $ solve f m s
-  solve (L y f) m s = abstract y (solve f m s)
+  update (K f) us = mapIx K $ update f us
+  update (L y f) us = abstract y (update f us)
 
 radWk :: Radical gamma t -> Radical (gamma :< s) t
 radWk (t ::: _T) = wk t ::: wk _T
@@ -251,21 +271,29 @@ radWk (t ::: _T) = wk t ::: wk _T
 instance Sub (Env delta) where
   sub' (ES p) xr s = mapIx ES (sub' p xr s)
 
-  solve (ES p) m s = mapIx ES (solve p m s)
+  update (E0 v) us = mapIx E0 (update v us)
+  update (ES p) us = mapIx ES (update p us)
 
 instance Sub (Instance s) where
   sub' (IS t) xr s = mapIx IS (sub' t xr s)
   sub' (IP p) xr s = mapIx IP (sub' p xr s)
 
-  solve (IS t) m s = mapIx IS (solve t m s)
-  solve (IP p) m s = mapIx IP (solve p m s)
+  update (IS t) us = mapIx IS (update t us)
+  update (IP p) us = mapIx IP (update p us)
 
 instance Sub (Term Pnt) where
   sub' (Hole meta gamma) xr s = mapIx (Hole meta) (sub' gamma xr s)
   -- TODO worry here
 
-  solve (Hole m' gamma) m s = mapIx (Hole m') (solve gamma m s)
+  update (Hole m' gamma) us = mapIx (Hole m') (update gamma us)
   -- TODO worry a lot - what if m is m'?
+
+updateContext :: Context gamma -> [Update] ->
+                 (Sorted gamma => Context gamma -> t) -> t
+updateContext C0                   us t = t C0
+updateContext (gamma :\ (s, x, i)) us t = subInfo s $
+  updateContext gamma us $ \ gamma -> t (gamma :\ (s, x, joinH (update i us)))
+
 
 ------------------------------------------------------------------------------
 -- computation is the elimination of radicals

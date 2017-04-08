@@ -13,6 +13,7 @@ import Data.List
 import Data.List.Split
 
 import Utils
+import OPE
 import Kernel
 import Render
 
@@ -121,3 +122,13 @@ display ps = case viewPort ps of
                        foldMap (displayEntity '-') es
   Cur ez _ []       -> foldMap (displayEntity '-') ez ++
                        ["", "==========================="]
+
+updates :: [Update] -> [Entity] -> [Entity]
+updates us [] = []
+updates us (EHole m@(Meta s x _Theta _I) : es) = subInfo s $
+  updateContext _Theta us $ \ _Theta ->
+  let m' = Meta s x _Theta (joinH (update _I us))
+  in EHole m' : updates ((m :=> Renew m') : us) es
+updates us (EDefn (Defn s x _Theta r) : es) =
+  updateContext _Theta us $ \ _Theta ->
+  EDefn (Defn s x _Theta (updateRadical r us)) : updates us es
