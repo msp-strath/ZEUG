@@ -15,6 +15,7 @@ import Data.List.Split
 import Utils
 import OPE
 import Kernel
+import Raw
 import Render
 
 data Cursor u x = Cur (Bwd x) u [x] deriving (Functor, Foldable, Traversable)
@@ -100,20 +101,21 @@ displayContext (gamma :\ (s, x, i)) = (bs ++ [b], NS nz x) where
 displayEntity :: Char -> Entity -> [String]
 displayEntity c (EHole m) = ("" : bs ++ [rule, h]) where
   (bs, nz) = displayContext (metaContext m)
-  h = "  " ++ show (metaName m) ++ "?" ++ case metaSort m of
+  h = "  " ++ show (RA Holey (show (metaName m) ++ "?")) ++ case metaSort m of
     Pnty -> ""
     Syny -> " : " ++ show (render nz (metaInfo m))
-  rule = replicate (2 + maximum [length x | x <- h : bs]) c
+  rule = replicate (2 + maximum [mylen x | x <- h : bs]) c
 displayEntity c (EDefn m) = ("" : bs ++ rule : hs) where
   (bs, nz) = displayContext (defnContext m)
   x = show (defnName m)
   hs = case (defnSort m, defnRadical m) of
-    (Pnty, RP p)     ->  ["  " ++ x ++ " = " ++ show (renderPnt nz p)]
+    (Pnty, RP p)     ->  ["  " ++ show (RA Defin x)
+                          ++ " = " ++ show (renderPnt nz p)]
     (Syny, t ::: _T) ->
-      [  "  " ++ x ++ " = " ++ show (render nz t)
-      ,  replicate (2 + length x) ' ' ++ " : " ++ show (render nz _T)
+      [  "  " ++ show (RA Defin x) ++ " = " ++ show (render nz t)
+      ,  replicate (2 + mylen x) ' ' ++ " : " ++ show (render nz _T)
       ]
-  rule = replicate (2 + maximum [length x | x <- hs ++ bs]) c
+  rule = replicate (2 + maximum [mylen x | x <- hs ++ bs]) c
 
 display :: ProofState -> [String]
 display ps = case viewPort ps of

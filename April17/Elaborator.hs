@@ -30,23 +30,23 @@ type ELAB a gamma = Prog Elaborator (a @= gamma) gamma
 
 chkBind :: Sorted gamma =>
            Sorty s -> Info s ^ gamma ->
-           (s !- Term Chk) ^ gamma -> Raw ->
+           (s !- Term Chk) ^ gamma -> Raw c ->
            ELAB ((s !- Term Chk) ^ gamma) gamma
-chkBind s _S _T (RB x t) =
+chkBind s _S _T (RB _ x t) =
   cmd $ Under (s , x , _S) $ chk (dive _T) t
 chkBind s _S _T t =
   cmd $ Under (s , "" , _S) $ chk (dive _T) t
 
 chk :: Sorted gamma =>
-       Term Chk ^ gamma -> Raw ->
+       Term Chk ^ gamma -> Raw c ->
        ELAB (Term Chk ^ gamma) gamma
-chk _T (RA ('?':xs)) = cmd $ Query xs _T
-chk (Star Void :^ r) (RA "Type") = raturn $ Star Void :^ r 
-chk (Star Void :^ r) (RC (RA "Pi") (_S :-: Only _T)) = 
+chk _T (RA _ ('?':xs)) = cmd $ Query xs _T
+chk (Star Void :^ r) (RA _ "Type") = raturn $ Star Void :^ r 
+chk (Star Void :^ r) (RC (RA _ "Pi") (_S :-: Only _T)) = 
   chk star _S @>= \_S -> 
   chkBind Syny _S (mapIx K star) _T @>= \_T ->
   raturn $ mapIx Pi (pair _S _T )
-chk (Pi _ST :^ r) (RC (RA "\\") (Only t)) = _ST :^ r >^< \ _S _T ->
+chk (Pi _ST :^ r) (RC (RA _ "\\") (Only t)) = _ST :^ r >^< \ _S _T ->
   chkBind Syny _S _T t @>= \t -> 
   raturn $ mapIx Lam t
 chk _T t = 
@@ -54,11 +54,11 @@ chk _T t =
   cmd (DefEq star _S _T) @>
   raturn s
 
-syn :: Sorted gamma => Raw -> ELAB (Radical gamma Syn) gamma
-syn (RA x) =
+syn :: Sorted gamma => Raw c -> ELAB (Radical gamma Syn) gamma
+syn (RA _ x) =
   cmd (Fetch Syny x) @>= \(x , _S) -> 
   raturn (mapIx (E . V) x ::: _S)
-syn (RC t (RA ":" :-: Only _T)) =
+syn (RC t (RA _ ":" :-: Only _T)) =
   chk star _T @>= \_T -> 
   chk _T t @>= \t -> 
   raturn (t ::: _T)
@@ -68,17 +68,17 @@ syn (RC f as) =
 syn _ = cmd $ Reject "raised eyebrow"
 
 spine :: Sorted gamma => Radical gamma Syn ->
-         NEL Raw -> ELAB (Radical gamma Syn) gamma
+         NEL (Raw c) -> ELAB (Radical gamma Syn) gamma
 spine h@(f ::: Pi _ST :^ r) (s :- as) = _ST :^ r >^< \ _S _T -> 
   chk _S s @>= \s ->
   raturn (app h s)
 spine _ _ = cmd $ Reject "raised eyebrow"
 
-define :: Sorted gamma => Raw -> ELAB (Unit ^ gamma) gamma
-define (RC (RA "=") (Only t)) =
+define :: Sorted gamma => Raw c -> ELAB (Unit ^ gamma) gamma
+define (RC (RA _ "=") (Only t)) =
   syn t @>= \ t ->
   cmd (Define t)
-define (RC _S (Only (RB x t))) =
+define (RC _S (Only (RB _ x t))) =
   chk star _S @>= \ _S ->
   cmd (Under (Syny, x, _S) (define t)) @>
   raturn (Void :^ oN)

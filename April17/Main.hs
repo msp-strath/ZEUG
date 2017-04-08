@@ -60,8 +60,8 @@ mainLoop oldz new b = do
   r <- rawIO
   putStrLn ""
   case r of
-    RA "quit" -> return ()
-    RA "undo" -> case oldz of
+    RA _ "quit" -> return ()
+    RA _ "undo" -> case oldz of
       B0 -> do
         putStrLn "Nothing to undo"
         mainLoop B0 new False

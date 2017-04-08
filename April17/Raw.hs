@@ -19,23 +19,29 @@ import Utils
 -- datatype of raw terms: deeply unsubtle
 ------------------------------------------------------------------------------
 
-data Raw
-  =  RA String         -- atoms (nonempty, legit characters)
-  |  RB String Raw     -- bindings
-  |  RC Raw (NEL Raw)  -- clumps have a head and a nonempty tail
+data Raw c
+  =  RA c String               -- atoms (nonempty, legit characters)
+  |  RB c String (Raw c)       -- bindings
+  |  RC (Raw c) (NEL (Raw c))  -- clumps have a head and a nonempty tail
 
-instance Show Raw where
+class Colour c where
+  colour  :: c -> String -> String
+
+instance Colour () where
+  colour () x = x
+
+instance Colour c => Show (Raw c) where
   show = big where
-    big (RA x)     = x
-    big (RB x r)   = x ++ ". " ++ big r
-    big (RC r rs)  = wee r ++ clu rs
+    big (RA c x)    = colour c x
+    big (RB c x r)  = colour c x ++ ". " ++ big r
+    big (RC r rs)   = wee r ++ clu rs
     clu (Only r) = case r of
-      RA x      -> " " ++ x
-      RB x r    -> " " ++ x ++ ". " ++ big r
+      RA c x    -> " " ++ colour c x
+      RB c x r  -> " " ++ colour c x ++ ". " ++ big r
       RC r rs   -> "," ++ clu (r :-: rs)
     clu (r :-: rs) = " " ++ wee r ++ clu rs
-    wee (RA x)         = x
-    wee r              = "(" ++ big r ++ ")"
+    wee (RA c x)  = colour c x
+    wee r         = "(" ++ big r ++ ")"
 
 
 ------------------------------------------------------------------------------
@@ -113,7 +119,7 @@ type READ x i = Prog ReadLine (Got x) i
 ------------------------------------------------------------------------------
 
 -- to eat a raw term, eat a head then check for a tail
-rawR :: READ Raw i
+rawR :: READ (Raw ()) i
 rawR = (headR />= tailR) />= \ rs -> case rs of
   Only r    -> rgturn r          -- if we get a singleton, that's it
   r :-: rs  -> rgturn (RC r rs)  -- otherwise, it's a clump
@@ -125,10 +131,10 @@ spcR = cmd Peek ?>= \ x -> case x of
   _                  -> rgturn ()
 
 -- grab a valid small raw term (which might be mutated by what's after it)
-headR :: READ Raw i
+headR :: READ (Raw ()) i
 headR = spcR /> cmd Peek ?>= \ x -> case x of
     -- make an atom?
-    See c | isAtomCh c  -> cmd Grok @> atomR />= \ s -> rgturn (RA (c : s))
+    See c | isAtomCh c  -> cmd Grok @> atomR />= \ s -> rgturn (RA () (c : s))
     -- an open paren means we can give a big thing, then a close
     See '('             -> cmd Grok @> rawR />= \ r -> closeR /> rgturn r
     -- otherwise, it's crap
@@ -152,15 +158,15 @@ headR = spcR /> cmd Peek ?>= \ x -> case x of
 
 
 -- look after a head; returns a nonempty list that might be a clump
-tailR :: Raw -> READ (NEL Raw) i
+tailR :: Raw () -> READ (NEL (Raw ())) i
 tailR r = spcR /> cmd Peek ?>= \ x -> case x of
   -- end of text or closing bracket means it's not a clump and we're done
   EOT      -> rgturn (Only r)
   See ')'  -> rgturn (Only r)
   -- dot means it's not a clump, it's a binding
   See '.' -> case r of
-    RA x   -> cmd Grok @> rawR />= \ r -> rgturn (Only (RB x r))
-    _      -> cmd Barf
+    RA _ x  -> cmd Grok @> rawR />= \ r -> rgturn (Only (RB () x r))
+    _       -> cmd Barf
   -- comma means the rest of the clump is just one thing
   See ','  -> cmd Grok @> rawR />= \ t -> rgturn (r :-: Only t)
   -- otherwise, whatever it is is more stuff for the clump
@@ -190,7 +196,7 @@ readString (DO Barf _) _               = Nothing
 -- parsing a String as a Raw
 ------------------------------------------------------------------------------
 
-rawString :: String -> Maybe Raw
+rawString :: String -> Maybe (Raw ())
 rawString = readString rawR . NUFF
 
 
@@ -248,5 +254,5 @@ unlogIO (LogGrok log) = do
   unlogIO log
 unlogIO (LogPeek log p) = logIO log p IONUFF
 
-rawIO :: IO Raw
+rawIO :: IO (Raw ())
 rawIO = rlIO rawR
