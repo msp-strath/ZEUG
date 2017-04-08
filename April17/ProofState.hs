@@ -9,6 +9,7 @@
 
 module ProofState where
 
+import Data.Maybe
 import Data.List
 import Data.List.Split
 
@@ -38,7 +39,7 @@ nameOf (EDefn d) = defnName d
 type Prefix = LongName
 type Range = (Maybe LongName, Maybe LongName)
 
-type ProofState = Cursor (Prefix,Range) Entity
+type ProofState = Cursor (Prefix, Range) Entity
 
 initialProofState :: ProofState
 initialProofState = Cur B0 (mempty,(Nothing,Nothing)) []
@@ -74,21 +75,17 @@ newName ps@(Cur _ (p, _) _) x = case x of
     good x = if any (isPrefixOf (longName x) . longName . nameOf) ps
       then Nothing else Just x
 
+inView :: (LongName, Maybe LongName) -> Entity -> Bool
+inView (p, n) e = isPrefixOf (longName p) x && not (isPrefixOf b x) where
+  x = longName (nameOf e)
+  b = maybe [""] (longName . mappend p) n -- [""] cannot prefix a name
+
 viewPort :: ProofState -> ProofState
 viewPort (Cur ez u@(p, (n0, n1)) es) = Cur (findz ez) u (finds es) where
-  m0 = case n0 of
-         Just n0 -> longName $ mappend p n0
-         Nothing -> [""] -- cannot a prefix of any name
-  m1 = case n1 of
-         Just n1 -> longName $ mappend p n1
-         Nothing -> [""] -- cannot a prefix of any name
-  q = longName p
-  findz (ez :< e) | isPrefixOf q n && not (isPrefixOf m0 n) = findz ez :< e
-    where n = longName (nameOf e)
-  findz _ = B0
-  finds (e : es) | isPrefixOf q n && not (isPrefixOf m0 n) = e : finds es
-    where n = longName (nameOf e)
-  finds _ = []
+  findz (ez :< e) | inView (p, n0) e  = findz ez :< e
+  findz _                             = B0
+  finds (e : es)  | inView (p, n1) e  = e : finds es
+  finds _                             = []
 
 displayContext :: Context gamma -> ([String], Namings gamma)
 displayContext C0 = ([], N0)

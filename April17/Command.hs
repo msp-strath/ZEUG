@@ -21,9 +21,14 @@ command (Cur ez u (EHole m@(Meta s x _Theta _I) : es))
     Nothing -> (["Naw."], Nothing)
     Just (t, Cur ez u es) ->
       ( ["Aye."]
-      , Just (Cur ez u (updates [m :=> Solve (mapIx IS t)] es))
+      , Just (fwdToGoal $ Cur ez u (updates [m :=> Solve (mapIx IS t)] es))
       )
 command ps c = (["Try doing something else."], Nothing)
+
+fwdToGoal :: ProofState -> ProofState
+fwdToGoal (Cur ez u@(p, (_, n)) (e@(EDefn _) : es)) | inView (p, n) e
+  = fwdToGoal (Cur (ez :< e) u es)
+fwdToGoal ps = ps
 
 isDefBody :: Raw c -> Bool
 isDefBody (RC (RA _ "=") (Only s))    = True
