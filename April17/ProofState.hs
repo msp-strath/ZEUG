@@ -42,9 +42,13 @@ type Prefix = LongName
 type Range = (Maybe LongName, Maybe LongName)
 
 type ProofState = Cursor (Prefix, Range) Entity
+type ViewPort = Cursor (Prefix, Range) (LongName, Entity)
 
 initialProofState :: ProofState
-initialProofState = Cur B0 (mempty,(Nothing,Nothing)) []
+initialProofState = Cur B0 zoomedOut []
+
+zoomedOut :: (Prefix, Range)
+zoomedOut = (mempty, (Nothing, Nothing))
 
 texas :: ProofState -> [String]
 texas _ =  -- art by Joan Stark
@@ -83,17 +87,23 @@ newName ps x = do
   guard . not $ any (isPrefixOf (longName y) . longName . nameOf) ps
   return y
 
-inView :: (LongName, Maybe LongName) -> Entity -> Bool
-inView (p, n) e = isPrefixOf (longName p) x && not (isPrefixOf b x) where
-  x = longName (nameOf e)
-  b = maybe [""] (longName . mappend p) n -- [""] cannot prefix a name
+inView :: (LongName, Maybe LongName) -> Entity -> Maybe (LongName, Entity)
+inView (p, n) e = do
+    m <- stripPrefix (longName p) (longName (nameOf e))
+    guard . not $ isPrefixOf (maybe [""] longName n) m
+      -- [""] cannot prefix a name
+    return (LongName m, e)
 
-viewPort :: ProofState -> ProofState
+viewPort :: ProofState -> ViewPort
 viewPort (Cur ez u@(p, (n0, n1)) es) = Cur (findz ez) u (finds es) where
-  findz (ez :< e) | inView (p, n0) e  = findz ez :< e
-  findz _                             = B0
-  finds (e : es)  | inView (p, n1) e  = e : finds es
-  finds _                             = []
+  findz (ez :< e) = case inView (p, n0) e of
+    Nothing -> B0
+    Just me -> findz ez :< me
+  findz _         = B0
+  finds (e : es)  = case inView (p, n1) e of
+    Nothing -> []
+    Just me -> me : finds es
+  finds _         = []
 
 displayContext :: Context gamma -> ([String], Namings gamma)
 displayContext C0 = ([], N0)
@@ -103,16 +113,16 @@ displayContext (gamma :\ (s, x, i)) = (bs ++ [b], NS nz x) where
     Syny -> show (RA Vrble x) ++ " : " ++ show (render nz i)
     Pnty -> show (RA Vrble x)
 
-displayEntity :: Char -> Entity -> [String]
-displayEntity c (EHole m) = ("" : bs ++ [rule, h]) where
+displayEntity :: Char -> (LongName, Entity) -> [String]
+displayEntity c (y, EHole m) = ("" : bs ++ [rule, h]) where
   (bs, nz) = displayContext (metaContext m)
-  h = "  " ++ show (RA Holey (show (metaName m) ++ "?")) ++ case metaSort m of
+  h = "  " ++ show (RA Holey (show y ++ "?")) ++ case metaSort m of
     Pnty -> ""
     Syny -> " : " ++ show (render nz (metaInfo m))
   rule = replicate (2 + maximum [mylen x | x <- h : bs]) c
-displayEntity c (EDefn m) = ("" : bs ++ rule : hs) where
+displayEntity c (y, EDefn m) = ("" : bs ++ rule : hs) where
   (bs, nz) = displayContext (defnContext m)
-  x = show (defnName m)
+  x = show y
   hs = case (defnSort m, defnRadical m) of
     (Pnty, RP p)     ->  ["  " ++ show (RA Defin x)
                           ++ " = " ++ show (renderPnt nz p)]
@@ -139,3 +149,15 @@ updates us (EHole m@(Meta s x _Theta _I) : es) = subInfo s $
 updates us (EDefn (Defn s x _Theta r) : es) =
   updateContext _Theta us $ \ _Theta ->
   EDefn (Defn s x _Theta (updateRadical r us)) : updates us es
+
+fwdToGoal :: ProofState -> ProofState
+fwdToGoal (Cur ez u@(p, (_, n)) (e@(EDefn _) : es))
+  | Just _ <- inView (p, n) e
+  = fwdToGoal (Cur (ez :< e) u es)
+fwdToGoal ps = ps
+
+fwdToView :: ProofState -> ProofState
+fwdToView ps@(Cur ez u@(p, (n, _)) (e : es))
+  | Nothing <- inView (p, n) e = fwdToView (Cur (ez :< e) u es)
+fwdToView ps = ps
+

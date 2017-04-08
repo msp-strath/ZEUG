@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, PatternGuards #-}
 
 module Command where
 
@@ -23,12 +23,12 @@ command (Cur ez u (EHole m@(Meta s x _Theta _I) : es))
       ( ["Aye."]
       , Just (fwdToGoal $ Cur ez u (updates [m :=> Solve (mapIx IS t)] es))
       )
+command ps@(Cur ez u es) (RC (RA _ "/") (Only (RA _ x))) =
+  case fwdToView (Cur B0 (fst (parseName ps x), (Nothing, Nothing))
+                      (ez <>> es)) of
+    Cur _ (LongName (_ : _), _) [] -> (["Where's " ++ x ++ "?"], Nothing)
+    ps -> ([], Just (fwdToGoal ps))
 command ps c = (["Try doing something else."], Nothing)
-
-fwdToGoal :: ProofState -> ProofState
-fwdToGoal (Cur ez u@(p, (_, n)) (e@(EDefn _) : es)) | inView (p, n) e
-  = fwdToGoal (Cur (ez :< e) u es)
-fwdToGoal ps = ps
 
 isDefBody :: Raw c -> Bool
 isDefBody (RC (RA _ "=") (Only s))    = True
