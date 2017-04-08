@@ -28,6 +28,8 @@ command ps@(Cur ez u es) (RC (RA _ "/") (Only (RA _ x))) =
                       (ez <>> es)) of
     Cur _ (LongName (_ : _), _) [] -> (["Where's " ++ x ++ "?"], Nothing)
     ps -> ([], Just (fwdToGoal ps))
+command (Cur ez u@(LongName p@(_ : _), _) es) (RA _ "<") =
+  ([], Just (Cur ez (LongName (init p), (Nothing, Nothing)) es))
 command ps c = (["Try doing something else."], Nothing)
 
 isDefBody :: Raw c -> Bool
