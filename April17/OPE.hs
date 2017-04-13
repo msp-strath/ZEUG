@@ -68,12 +68,16 @@ discard (O' r) (AS ps _) = discard r ps
 
 missDiscard :: CoP gamma0 gamma1 gamma ->
                Select gamma theta ^ delta -> ALL f theta ->
-               (forall theta0 theta1.
+               (forall theta0 theta1. (Sorted theta0,Sorted theta1) =>
                 Select gamma0 theta0 ^ delta -> ALL f theta0 ->
                 Select gamma1 theta1 ^ delta -> ALL f theta1 -> t) ->
                t
 missDiscard c (xz :^ r) fz g = case hits xz c of
-  Hits xz0 xz1 c0 c1 -> g (xz0 :^ r -<=- lCoP c1) (discard (lCoP c0) fz) (xz1 :^ r -<=- rCoP c1) (discard (rCoP c0) fz)
+  Hits xz0 xz1 c0 c1 ->
+    g (xz0 :^ r -<=- lCoP c1)
+      (discard (lCoP c0) fz)
+      (xz1 :^ r -<=- rCoP c1)
+      (discard (rCoP c0) fz)
                
 
 {-
@@ -206,7 +210,8 @@ data Select :: Bwd s -> Bwd s -> Bwd s -> * where
   Miss :: Select gamma' delta gamma -> Select (gamma' :< s) delta (gamma :< s)
 
 data Hits :: Bwd s -> Bwd s -> Bwd s -> Bwd s -> * where
-  Hits :: Select gamma0' theta0 gamma0 -> Select gamma1' theta1 gamma1 ->
+  Hits :: (Sorted gamma0, Sorted gamma1, Sorted theta0, Sorted theta1) =>
+          Select gamma0' theta0 gamma0 -> Select gamma1' theta1 gamma1 ->
           CoP theta0 theta1 theta -> CoP gamma0 gamma1 gamma ->
           Hits gamma0' gamma1' theta gamma
 
@@ -247,9 +252,19 @@ thickSelect (O' r) (Hit s) = case thickSelect r s of
 thickSelect (O' r) (Miss s) = case thickSelect r s of
   ThickSelect s rtheta rdelta -> ThickSelect s rtheta (O' rdelta)
 
-wkSelect :: Select gamma theta ^ delta ->
-            Select (gamma :< s) theta ^ (delta :< s)
-wkSelect (xz :^ r) = Miss xz :^ OS r
+wkSelect :: (s !- f) gamma -> Select gamma theta ^ delta ->
+            (forall gamma'.
+              String -> f gamma' -> Select gamma' theta ^ (delta :< s) -> t)
+            -> t
+wkSelect (L x t) (xz :^ r) g = g x t (Miss xz :^ OS r)
+wkSelect (K t) (xz :^ r) g = g "YKW" t (xz :^ O' r)
+
+sortedSelect :: Select gamma theta delta ->
+                Holds (Sorted gamma,Sorted theta,Sorted delta)
+sortedSelect None t = t
+sortedSelect (Hit s) t = sortedSelect s t
+sortedSelect (Miss s) t = sortedSelect s t
+
 
 ------------------------------------------------------------------------------
 --  relevant data structures

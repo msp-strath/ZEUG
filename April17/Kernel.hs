@@ -106,6 +106,7 @@ star = Star Void :^ oN
 freshVar :: Sorted gamma => Term Chk ^ (gamma :< Syn)
 freshVar = E (V It) :^ OS oN
 
+
 ------------------------------------------------------------------------------
 -- typed (eta expanding) substitution
 ------------------------------------------------------------------------------
@@ -119,14 +120,37 @@ tsubChk :: Sorted delta => -- is it really needed?
            Term Chk ^ delta
 tsubChk delta (_T :^ _) _ _ _ | isDull _T = Dull Void :^ oN
 tsubChk delta (Star Void :^ _) (Star Void) (None :^ _) A0 = star
-tsubChk delta (Star Void :^ _) (Pi (Pair c _S _T)) xz fz =
-  missDiscard c xz fz $ \ xzS fzS xzT fzT ->
+tsubChk delta (Star Void :^ _) (Pi (Pair c _S _T)) xz fz = sortedCoP c $
+  missDiscard c xz fz $ \ xzS fzS xzT fzT -> wkSelect _T xzT $ \ x _T xzT ->
   let _S' = tsubChk delta star _S xzS fzS
-      _T' = case _T of
-        L x _T -> abstract x $ tsubChk (delta :\ (Syny, x, _S')) star _T
-                    (wkSelect xzT) (mapIx radWk fzT)
-        K _T -> mapIx K $ tsubChk delta star _T xzT fzT
+      _T' = abstract x $ tsubChk (delta :\ (Syny, x, _S')) star _T
+               xzT (mapIx radWk fzT)
   in mapIx Pi (pair _S' _T')
+tsubChk delta (Pi _ST :^ _R) f (xz :^ r) fz = sortedSelect xz $
+  _ST :^ _R >^< \_S _T@(_Tnohat :^ _) ->
+  let guts = case f of
+        Lam t -> t
+        E e -> L (nom _Tnohat) (E (App (Pair (C'S copL) e (E (V It)))))
+  in mapIx Lam $ wkSelect guts (xz :^ r) $ \ x t xzt ->
+       abstract x $
+         tsubChk (delta :\ (Syny, x, _S)) (dive _T) t xzt (mapIx radWk fz)
+tsubChk delta _ (E e) xz fz = stop (Left $ tsubSyn delta e xz fz)
+
+tsubSyn :: Sorted delta => -- is it really needed?
+           Context delta ->
+           Term Syn gamma -> -- term
+           Select gamma theta ^ delta ->
+           ALL (Radical delta) theta ->
+           Radical delta Syn
+tsubSyn delta (V It) (Hit None :^ r) (AS A0 s) = s
+tsubSyn delta (V It) (Miss None :^ r) A0 = E (V It) :^ r ::: lookupC delta r
+tsubSyn delta (App (Pair c f a)) z theta =
+  missDiscard c z theta $ \ zr0 theta0 zr1 theta1 ->
+  case tsubSyn delta f zr0 theta0 of
+    f@(_ ::: Pi _ST :^ _R) ->
+      _ST :^ _R >^< \_S _T -> app f (tsubChk delta _S a zr1 theta1)
+
+--tsubSyn (Hole meta gamma) xr s = Right (mapIx (Hole meta) (tsub gamma xr s))
 
 isDull :: Term Chk gamma -> Bool
 isDull (One Void) = True
