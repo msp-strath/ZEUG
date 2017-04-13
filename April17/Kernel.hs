@@ -357,6 +357,7 @@ app (f :^ r ::: Pi _ST :^ _R) s = _ST :^ _R >^< \ _S _T ->
   (case f of
     E e   -> mapIx (E . App) (pair (e :^ r) s)
     Lam t -> instantiate (t :^ r) (s ::: _S)
+    Dull Void -> Dull Void :^ r
   ) ::: instantiate _T (s ::: _S)
 
 -- don't use this to substitute var 0 for var 0!
