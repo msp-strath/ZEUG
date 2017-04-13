@@ -38,12 +38,14 @@ type Sorts = Bwd Sort
 
 data Term :: Sort -> (Bwd Sort -> *) where
   Star :: Unit gamma -> Term Chk gamma
+  One :: Unit gamma -> Term Chk gamma 
   Pi :: (Term Chk  ><  Syn !- Term Chk) gamma -> Term Chk gamma
   Lam :: (Syn !- Term Chk) gamma -> Term Chk gamma
   E :: Term Syn gamma -> Term Chk gamma
   V :: This Syn gamma -> Term Syn gamma
   App :: (Term Syn >< Term Chk) gamma -> Term Syn gamma
   Hole :: Meta delta s -> Env delta gamma -> Term s gamma
+  Dull :: Unit gamma -> Term Chk gamma
 
 newtype LongName = LongName {longName :: [String]} deriving (Eq,Monoid)
 
@@ -104,6 +106,33 @@ star = Star Void :^ oN
 freshVar :: Sorted gamma => Term Chk ^ (gamma :< Syn)
 freshVar = E (V It) :^ OS oN
 
+------------------------------------------------------------------------------
+-- typed (eta expanding) substitution
+------------------------------------------------------------------------------
+
+tsubChk :: Sorted delta => -- is it really needed?
+           Context delta ->
+           Term Chk ^ delta -> -- type
+           Term Chk gamma -> -- term
+           Select gamma theta ^ delta ->
+           ALL (Radical delta) theta ->
+           Term Chk ^ delta
+tsubChk delta (_T :^ _) _ _ _ | isDull _T = Dull Void :^ oN
+tsubChk delta (Star Void :^ _) (Star Void) (None :^ _) A0 = star
+tsubChk delta (Star Void :^ _) (Pi (Pair c _S _T)) xz fz =
+  missDiscard c xz fz $ \ xzS fzS xzT fzT ->
+  let _S' = tsubChk delta star _S xzS fzS
+      _T' = case _T of
+        L x _T -> abstract x $ tsubChk (delta :\ (Syny, x, _S')) star _T
+                    (wkSelect xzT) (mapIx radWk fzT)
+        K _T -> mapIx K $ tsubChk delta star _T xzT fzT
+  in mapIx Pi (pair _S' _T')
+
+isDull :: Term Chk gamma -> Bool
+isDull (One Void) = True
+isDull (Pi (Pair c _ (L x _T))) = isDull _T
+isDull (Pi (Pair c _ (K _T))) = isDull _T
+isDull _                  = False
 
 ------------------------------------------------------------------------------
 -- substitution is hereditary 
@@ -305,12 +334,13 @@ app (f :^ r ::: Pi _ST :^ _R) s = _ST :^ _R >^< \ _S _T ->
     E e   -> mapIx (E . App) (pair (e :^ r) s)
     Lam t -> instantiate (t :^ r) (s ::: _S)
   ) ::: instantiate _T (s ::: _S)
-  
+
+-- don't use this to substitute var 0 for var 0!
 instantiate :: (s !- Term Chk) ^ delta -> Radical delta s ->
                Term Chk ^ delta
 instantiate (K t :^ r) _ = t :^ r
 instantiate (L _ t :^ r) a = sortedObj r $ sub t (Hit misser :^ r) (AS A0 a)
-                                  
+
 ------------------------------------------------------------------------------
 -- environments of the unremarkable kind
 ------------------------------------------------------------------------------
